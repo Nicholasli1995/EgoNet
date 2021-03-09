@@ -4,7 +4,7 @@ Official project website for the CVPR 2021 paper "Exploring intermediate represe
 This repository is under preparation and the first release is expected to be at the end of March, 2021. Please visit in the future.
 
 <p align="center">
-  <img src="https://github.com/Nicholasli1995/EgoNet/blob/main/imgs/teaser.jpg"  width="830" height="200" />
+  <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/teaser.jpg"  width="830" height="200" />
 </p>
 
 ## Reference
