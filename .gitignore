@@ -1,0 +1,13 @@
+#/*
+**/__pycache__
+.spyproject/
+*.yml
+*.log
+*.ini
+*.bak
+*.pth
+*.csv
+*.jpg
+*.png
+*.pdf
+
