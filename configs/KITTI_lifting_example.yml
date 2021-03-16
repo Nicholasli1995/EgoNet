@@ -1,0 +1,110 @@
+# YAML file storing experimental configurations for KITTI dataset
+
+## general settings
+name: '3D car pose estimation'
+exp_type: '2dto3d'
+model_type: 'FCModel'
+use_gpu: True
+gpu_id: [1] # modify this to the GPU/GPUs that you use 
+
+## operations
+train: True # perform training
+save: False # save the trained model
+visualize: False # visualize the training results
+evaluate: False # perform evaluation
+
+## paths to the relevant directories
+dirs:
+    # modify the output directories as you need
+    output: 'home/YOUR_NAME/YOUR_FOLDER/experiments/EgoNet/DATE/' 
+    debug: 'home/YOUR_NAME/YOUR_FOLDER/experiments/EgoNet/DATE/debug'
+    data_vis: 'home/YOUR_NAME/YOUR_FOLDER/experiments/EgoNet/DATE/vis'
+
+## CUDNN settings
+cudnn:
+    enabled: True
+    deterministic: False
+    benchmark: False
+
+## metrics used for evaluating orientation estimation
+metrics:
+    R3D:
+        T_style: 'direct'
+        R_style: 'euler'
+    JD3D:
+        style: 'direct'
+    RTError3D:
+        T_style: 'direct'
+        R_style: 'euler'
+
+## dataset settings
+dataset:
+    name: 'KITTI'
+    detect_classes: ['Car'] # used class for training
+    3d_kpt_sample_style: 'bbox9' # construct a cuboid for each 3D bounding box
+    # interpolate the 3D bbox
+    interpolate:
+        flag: True
+        style: 'bbox12'
+        coef: [0.332, 0.667]
+    # do some pre-processing
+    pre-process: False
+    root: 'home/YOUR_NAME/YOUR_FOLDER/KITTI' # modify this to your own path      
+    # input-output representation for 2d-to-3d lifting
+    lft_in_rep: 'coordinates2d' # 2d coordinates on screen
+    lft_out_rep: 'R3d' # 3d coordinates relative to centroid plus translation vector
+
+## optional cascaded regression
+cascade: 
+    num_stages: 1 # the default is simply no cascade
+
+## model settings for a fully-connected network if used
+FCModel:
+    name: 'lifter'
+    refine_3d: False 
+    norm_twoD: False
+    num_blocks: 2 
+    num_neurons: 1024
+    dropout: 0.5
+    leaky: False
+    loss_type: MSELoss1D
+    loss_reduction: 'mean'
+
+## training settings  
+training_settings:
+    total_epochs: 300
+    resume: False
+    batch_size: 2048
+    num_threads: 4 # set the number of workers that works for your machine
+    shuffle: True
+    pin_memory: False
+    report_every: 500 # report every 500 batches
+    eval_every: 500 # test on the evaluation set every 500 batches
+    eval_during: True # test on the evaluation set during the training process
+    # how many times to augment data for 2D-to-3D lifting
+    lft_aug: True
+    lft_aug_times: 100
+    # what evaluation metrics to use
+    eval_metrics: ['RError3D']
+    plot_loss: False # visualize the loss function during training 
+
+## testing settings if used
+testing_settings:
+    apply_dropout: False
+    unnormalize: True
+    batch_size: 1024
+    num_threads: 4
+    shuffle: False
+
+## optimizer settings
+optimizer:
+    # for ADAM
+    optim_type: 'adam'
+    lr: 0.001
+    weight_decay: 0.0
+    # for SGD
+    momentum: 0.9
+    # learning rate will decay at each milestone epoch
+    milestones: [50, 100, 150, 250]
+    gamma: 0.5
+
