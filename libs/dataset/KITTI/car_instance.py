@@ -745,6 +745,11 @@ class KITTI(bc.SupervisedDataset):
         return 
     
     def csv_read_annot(self, file_path, fieldnames):
+        """
+        Read instance attributes in the KITTI format. Instances not in the 
+        selected class will be ignored. A list of python dictionary is returned
+        where each dictionary represents one instsance.
+        """        
         annotations = []
         with open(file_path, 'r') as csv_file:
             reader = csv.DictReader(csv_file, delimiter=' ', fieldnames=fieldnames)
@@ -756,13 +761,20 @@ class KITTI(bc.SupervisedDataset):
                         "truncation": float(row["truncated"]),
                         "occlusion": float(row["occluded"]),
                         "alpha": float(row["alpha"]),
-                        "dimensions": [float(row['dl']), float(row['dh']), float(row['dw'])],
-                        "locations": [float(row['lx']), float(row['ly']), float(row['lz'])],
+                        "dimensions": [float(row['dl']), 
+                                       float(row['dh']), 
+                                       float(row['dw'])
+                                       ],
+                        "locations": [float(row['lx']), 
+                                      float(row['ly']), 
+                                      float(row['lz'])
+                                      ],
                         "rot_y": float(row["ry"]),
                         "bbox": [float(row["xmin"]),
                                  float(row["ymin"]),
                                  float(row["xmax"]),
-                                 float(row["ymax"])]
+                                 float(row["ymax"])
+                                 ]
                     }
                     if "score" in fieldnames:
                         annot_dict["score"] = float(row["score"])
@@ -770,6 +782,9 @@ class KITTI(bc.SupervisedDataset):
         return annotations
     
     def csv_read_calib(self, file_path):
+        """
+        Read camera projection matrix in the KITTI format.
+        """  
         # get camera intrinsic matrix K
         with open(file_path, 'r') as csv_file:
             reader = csv.reader(csv_file, delimiter=' ')
@@ -851,17 +866,19 @@ class KITTI(bc.SupervisedDataset):
         if calib_path is None:
             calib_path = pjoin(self._data_config['calib_dir'], image_name[:-3] + 'txt')
         anns, P = self.load_annotations(label_path, calib_path, fieldnames=fieldnames)
-        # use different (slightly) intrinsic parameters for different images
+        # The intrinsics may vary slightly for different images
+        # Yet one may convert them to a fixed one by applying a homography
         K = P[:, :3]
-        # Test: use identical intrinsic parameters for all images
+        # Debug: use pre-defined intrinsic parameters
         # K = np.array([[707.0493,   0.    , 604.0814],
         #               [  0.    , 707.0493, 180.5066],
         #               [  0.    ,   0.    ,   1.    ]], dtype=np.float32)
         shift = np.linalg.inv(K) @ P[:, 3].reshape(3,1)      
         # P containes intrinsics and extrinsics, we factorize P to K[I|K^-1t] 
         # and use extrinsics to compute the camera coordinate
-        # here the extrinsics actually means the shift between current camera to
+        # here the extrinsics means the shift between current camera to
         # the reference grayscale camera        
+        # For more calibration details, refer to "Vision meets Robotics: The KITTI Dataset"
         camera_coordinates = []
         pose_vecs = []
         # id includes the class and size of the object
@@ -967,7 +984,10 @@ class KITTI(bc.SupervisedDataset):
         return
     
     def _generate_2d_3d_paris(self):
-        # use the original 2D-3D pairs annotated by the author
+        """
+        Prepare pair of 2D screen coordinates and 3D cuboid representation.
+        
+        """
         path_list = self._data_config['image_path_list']
         kpt_3d_style = self._data_config['3d_kpt_sample_style']
         in_rep = self._data_config['lft_in_rep']
@@ -979,12 +999,13 @@ class KITTI(bc.SupervisedDataset):
         augment_times = self._data_config['lft_aug_times']
         for path in path_list:
             list_2d, list_3d, ids, _ = self.get_2d_3d_pair(path, 
-                                                   style=kpt_3d_style,
-                                                   in_rep = in_rep,
-                                                   out_rep = out_rep,
-                                                   augment=augment,
-                                                   augment_times=augment_times,
-                                                   add_visibility=True)            
+                                                           style=kpt_3d_style,
+                                                           in_rep = in_rep,
+                                                           out_rep = out_rep,
+                                                           augment=augment,
+                                                           augment_times=augment_times,
+                                                           add_visibility=True
+                                                           )            
             input_list += list_2d
             output_list += list_3d
             id_list += ids
