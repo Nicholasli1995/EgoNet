@@ -711,7 +711,7 @@ class KITTI(bc.SupervisedDataset):
             # translation
             locs = pose_vec[0, :3]
             rots = pose_vec[0, 3:]
-            x, y, z = locs[0], locs[1], locs[2]
+            x, y, z = locs[0], locs[1], locs[2] # bottom center of the labeled 3D box
             rx, ry, rz = rots[0], rots[1], rots[2]
             # TEMPORAL TESTING: rotation and translation augmentation
             # This purturbation turns out to work well for rotation estimation
@@ -733,7 +733,7 @@ class KITTI(bc.SupervisedDataset):
                 rot_matz = np.array([[np.cos(rz), -np.sin(rz), 0],
                                     [np.sin(rz), np.cos(rz), 0],
                                     [0, 0, 1]])        
-                # data augmentation
+                # TODO: correct here
                 rot_mat = rot_matz @ rot_maty @ rot_matx     
             else:
                 rot_mat = rot_maty
@@ -853,8 +853,8 @@ class KITTI(bc.SupervisedDataset):
                        augment=False, 
                        augment_times=1,
                        add_visibility=True,
-                       add_raw_bbox=False,
-                       add_rotation=False,
+                       add_raw_bbox=False, # add original bbox annotation from KITTI
+                       add_rotation=False, # add orientation angles
                        bbox_only=False, # only returns raw bounding box
                        filter_outlier=True,
                        fieldnames=FIELDNAMES
@@ -876,7 +876,7 @@ class KITTI(bc.SupervisedDataset):
         shift = np.linalg.inv(K) @ P[:, 3].reshape(3,1)      
         # P containes intrinsics and extrinsics, we factorize P to K[I|K^-1t] 
         # and use extrinsics to compute the camera coordinate
-        # here the extrinsics means the shift between current camera to
+        # here the extrinsics represent the shift between current camera to
         # the reference grayscale camera        
         # For more calibration details, refer to "Vision meets Robotics: The KITTI Dataset"
         camera_coordinates = []
@@ -898,7 +898,7 @@ class KITTI(bc.SupervisedDataset):
             if add_rotation:
                 rotations.append(np.array([a["alpha"], a["rot_y"]]).reshape(1,2))
             # apply data augmentation to represent a larger variation of
-            # 6DoF pose and translation 
+            # 3D pose and translation 
             if bbox_only:
                 continue
             aug_ids, aug_pose_vecs = self.augment_pose_vector(locs,
@@ -991,7 +991,7 @@ class KITTI(bc.SupervisedDataset):
         path_list = self._data_config['image_path_list']
         kpt_3d_style = self._data_config['3d_kpt_sample_style']
         in_rep = self._data_config['lft_in_rep']
-        out_rep = self._data_config['lft_out_rep']
+        out_rep = self._data_config['lft_out_rep'] # R3d encodes 3D rotation
         input_list = []
         output_list = []
         id_list = []
