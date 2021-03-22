@@ -1,0 +1,197 @@
+# YAML file storing experimental configurations for KITTI dataset
+
+## general settings
+name: 'kitti_kpt_loc'
+exp_type: 'instanceto2d'
+model_type: 'heatmapModel'
+use_gpu: True
+gpu_id: [0,1,] # modify this to the GPU/GPUs that you use 
+
+## operations
+train: True
+save: True
+visualize: False
+evaluate: False
+
+## used directories
+dirs:
+    # output directory
+    output: '/media/nicholas/Database/experiments/3DLearning/20210322' 
+    debug: '/media/nicholas/Database/experiments/3DLearning/20210322/debug'
+
+## CUDNN settings
+cudnn:
+    enabled: True
+    deterministic: False
+    benchmark: False
+
+## dataset settings
+dataset:
+    name: 'KITTI'
+    detect_classes: ['Car']
+    3d_kpt_sample_style: 'bbox9'
+    interpolate:
+        flag: True
+        style: 'bbox12'
+        coef: [0.332, 0.667]
+    # do some pre-processing
+    pre-process: False
+    root: '/media/nicholas/Database/datasets/KITTI'
+    # augmentation parameters
+    scaling_factor: 0.2
+    rotation_factor: 30. # degrees
+    # pytorch image transformation setting
+    pth_transform:
+#        mean: [0.485, 0.456, 0.406, 0., 0.] # TODO re-calculate this: R, G, B, X, Y 
+#        std: [0.229, 0.224, 0.225, 1., 1.]    
+        mean: [0.485, 0.456, 0.406] # TODO re-calculate this: R, G, B, X, Y 
+        std: [0.229, 0.224, 0.225]    
+    2d_kpt_style: 'bbox9'
+
+## self-supervision settings
+ss:
+    flag: False
+    record_path: '/media/nicholas/Database/datasets/ApolloScape/3DCarInstance/train/Apollo_ss_record.npy'
+    img_root: '/media/nicholas/Database/datasets/ApolloScape/3DCarInstance/train/images'
+    max_per_img: 12
+
+## settings for a fully-convolutional heatmap regression model
+heatmapModel:
+    name: hrnet # here a high-resolution (hr) model is used
+    add_xy: False # concatenate xy coodrinate maps along with the input
+    jitter_bbox: True
+    jitter_params:
+        shift:
+        - 0.1
+        - 0.1
+        scaling:
+        - 0.4
+        - 0.4
+    input_size: 
+    - 256
+    - 256
+    # rotate and scaling and input images
+    augment_input: True
+    # one can choose to regress dense semantic heatmaps or coordinates 
+#    head_type: 'heatmap'
+    head_type: 'coordinates'
+#    head_type: 'angleregression'
+    # up-sampling with pixel-shuffle
+    pixel_shuffle: False
+    # if an intermediate heatmap is produced
+    heatmap_size:
+    - 64
+    - 64
+    loss_type: JointsCompositeLoss
+    # the following two settings are only valid for JointsCompositeLoss
+    loss_spec_list: ['mse', 'l1', 'sl1']
+    loss_weight_list: [1.0, 0.1, 'None']
+    cr_loss_threshold: 0.1
+    init_weights: true
+    num_joints: 33
+    use_different_joints_weight: False
+    pretrained: '/media/nicholas/Database/kitti/20200417/KITTI/heatmapModel/final_state_cpu.pth'
+#    pretrained: '/home/nicholas/Documents/pre_trained/hrn/coco/pose_hrnet_w48_256x192.pth'
+# pretrained: False
+    target_type: gaussian
+    sigma: 1
+    extra:
+        pretrained_layers:
+        - 'conv1'
+        - 'bn1'
+        - 'conv2'
+        - 'bn2'
+        - 'layer1'
+        - 'transition1'
+        - 'stage2'
+        - 'transition2'
+        - 'stage3'
+        - 'transition3'
+        - 'stage4'
+        final_conv_kernel: 1
+        stage2:
+            num_modules: 1
+            num_branches: 2
+            block: basic
+            num_blocks:
+            - 4
+            - 4
+            num_channels:
+            - 48
+            - 96
+            fuse_method: sum
+        stage3:
+            num_modules: 4
+            num_branches: 3
+            block: basic
+            num_blocks:
+            - 4
+            - 4
+            - 4
+            num_channels:
+            - 48
+            - 96
+            - 192
+            fuse_method: sum
+        stage4:
+            num_modules: 3
+            num_branches: 4
+            block: basic
+            num_blocks:
+            - 4
+            - 4
+            - 4
+            - 4
+            num_channels:
+            - 48
+            - 96
+            - 192
+            - 384
+            fuse_method: sum
+
+## training settings  
+training_settings:
+    total_epochs: 50
+    resume: False
+    batch_size: 2
+    num_threads: 0
+    shuffle: True
+    pin_memory: False
+    # weighted loss computation
+    use_target_weight: False
+    report_every: 100
+    eval_every: 1000
+    eval_during: True
+    eval_metrics: ['JointDistance2DSIP']
+    plot_loss: False
+    # debugging configurations 
+    debug: 
+        save: True # save some intermeadiate results
+        save_images_kpts: True
+        save_hms_gt: True
+        save_hms_pred: True
+
+## testing settings
+testing_settings:
+    batch_size: 2
+    num_threads: 4
+    shuffle: False
+    pin_memory: False
+    apply_dropout: False
+    unnormalize: False
+    eval_metrics: ['JointDistance2DSIP']
+    # use hard or soft-argmax when mapping heatmaps to 2D coordinates
+    arg_max: 'soft'
+
+## optimizer settings
+optimizer:
+    # for ADAM
+    optim_type: 'adam'
+    lr: 0.001
+    weight_decay: 0.0
+    # for SGD
+    momentum: 0.9
+    # learning rate decay
+    milestones: [10, 20, 30, 40]
+    gamma: 0.5
+

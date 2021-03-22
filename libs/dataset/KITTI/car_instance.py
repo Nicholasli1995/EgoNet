@@ -320,7 +320,8 @@ class KITTI(bc.SupervisedDataset):
                 'boxes':all_boxes, 
                 'rots':all_rotations,
                 'kpts':all_keypoints,
-                'raw_kpts':all_keypoints_raw}
+                'raw_kpts':all_keypoints_raw
+                }
     
     def _prepare_detection_records(self, save=False, threshold = 0.1):
         # DEPRECATED UNTIL FURTHER UPDATE

@@ -23,7 +23,8 @@ def parse_args():
     # path to the configuration file
     parser.add_argument('cfg',
                         help='experiment configuration file path',
-                        type=str)
+                        type=str
+                        )
     args, unknown = parser.parse_known_args()
     configs = read_yaml_file(args.cfg)         
     return configs
