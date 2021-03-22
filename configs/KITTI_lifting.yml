@@ -5,7 +5,7 @@ name: '3D car pose estimation'
 exp_type: '2dto3d'
 model_type: 'FCModel'
 use_gpu: True
-gpu_id: [1] # modify this to the GPU/GPUs that you use 
+gpu_id: [0] # modify this to the GPU/GPUs that you use 
 
 ## operations
 train: True # perform training
@@ -31,36 +31,20 @@ metrics:
     R3D:
         T_style: 'direct'
         R_style: 'euler'
-    JD3D:
-        style: 'direct'
-    RTError3D:
-        T_style: 'direct'
-        R_style: 'euler'
 
 ## dataset settings
 dataset:
     name: 'KITTI'
-    detect_classes: ['Car']
-    3d_kpt_sample_style: 'bbox9'
+    detect_classes: ['Car'] # used class for training
+    3d_kpt_sample_style: 'bbox9' # construct a cuboid for each 3D bounding box
     # interpolate the 3D bbox
     interpolate:
         flag: False
         style: 'bbox12'
         coef: [0.332, 0.667]
     # do some pre-processing
-    pre-process: True
-    root: '/media/nicholas/Database/datasets/KITTI' # modify this to your own path
-    # augmentation parameters
-    scaling_factor: 0.2
-    rotation_factor: 30. # degrees
-    # pytorch image transformation setting
-    pth_transform:
-# mean: [0.485, 0.456, 0.406, 0., 0.] # TODO re-calculate this: R, G, B, X, Y 
-# std: [0.229, 0.224, 0.225, 1., 1.]    
-        mean: [0.485, 0.456, 0.406] # TODO re-calculate this: R, G, B, X, Y 
-        std: [0.229, 0.224, 0.225]          
-    # annotation style for 2d key-point
-    2d_kpt_style: 'bbox9' # projected 3d bounding box corner and center points
+    pre-process: False
+    root: '/media/nicholas/Database/datasets/KITTI' # modify this to your own path    
     # input-output representation for 2d-to-3d lifting
     lft_in_rep: 'coordinates2d' # 2d coordinates on screen
     lft_out_rep: 'R3d' # 3d coordinates relative to centroid plus translation vector
@@ -71,7 +55,7 @@ cascade:
 
 ## model settings for a fully-connected network if used
 FCModel:
-    name: 'tempt_model'
+    name: 'lifter'
     refine_3d: False 
     norm_twoD: False
     num_blocks: 2 
@@ -81,124 +65,35 @@ FCModel:
     loss_type: MSELoss1D
     loss_reduction: 'mean'
 
-## model settings for a high-resolution heatmap regression model if used
-heatmapModel:
-    name: hrnet
-    add_xy: False
-    jitter_bbox: True
-    jitter_params:
-        shift:
-        - 0.1
-        - 0.1
-        scaling:
-        - 0.4
-        - 0.4
-    input_size: 
-    - 256
-    - 256
-    # rotate and scaling and input images
-    augment_input: True
-    heatmap_size:
-    - 256
-    - 256
-    loss_type: JointsMSELoss
-    init_weights: true
-    num_joints: 9
-    use_different_joints_weight: False
-    pretrained: '/media/nicholas/Database/apollo3d/20200311/ApolloScape/heatmapModel/add_da.pth'
-# pretrained: False
-    target_type: gaussian
-    sigma: 6
-    extra:
-        pretrained_layers:
-        - 'conv1'
-        - 'bn1'
-        - 'conv2'
-        - 'bn2'
-        - 'layer1'
-        - 'transition1'
-        - 'stage2'
-        - 'transition2'
-        - 'stage3'
-        - 'transition3'
-        - 'stage4'
-        final_conv_kernel: 1
-        stage2:
-            num_modules: 1
-            num_branches: 2
-            block: basic
-            num_blocks:
-            - 4
-            - 4
-            num_channels:
-            - 48
-            - 96
-            fuse_method: sum
-        stage3:
-            num_modules: 4
-            num_branches: 3
-            block: basic
-            num_blocks:
-            - 4
-            - 4
-            - 4
-            num_channels:
-            - 48
-            - 96
-            - 192
-            fuse_method: sum
-        stage4:
-            num_modules: 3
-            num_branches: 4
-            block: basic
-            num_blocks:
-            - 4
-            - 4
-            - 4
-            - 4
-            num_channels:
-            - 48
-            - 96
-            - 192
-            - 384
-            fuse_method: sum
-
 ## training settings  
 training_settings:
     total_epochs: 300
+    eval_start_epoch: 250 # start evaluation after this epoch
     resume: False
-    begin_epoch: 1
-    end_epoch: 10
     batch_size: 2048
-    num_threads: 4
+    num_threads: 4 # set the number of workers that works for your machine
     shuffle: True
     pin_memory: False
-    # weighted loss computation
-    use_target_weight: True
-    report_every: 500
-    eval_every: 500
-    eval_during: True
+    report_every: 500 # report every 500 batches
+    eval_every: 500 # test on the evaluation set every 500 batches
+#    report_every: 5 # report every 500 batches
+#    eval_every: 5 # test on the evaluation set every 500 batches
+    eval_during: True # test on the evaluation set during the training process
     # how many times to augment data for 2D-to-3D lifting
     lft_aug: True
     lft_aug_times: 100
     # what evaluation metrics to use
     eval_metrics: ['RError3D']
-    plot_loss: False
-    # debugging configurations 
-    debug: 
-        save: False # save some intermeadiate results
-        save_images_gt: False
-        save_images_pred: False
-        save_hms_gt: False
-        save_hms_pred: False
+    plot_loss: False # visualize the loss function during training 
 
-## testing settings
+## testing settings if used
 testing_settings:
     apply_dropout: False
     unnormalize: True
     batch_size: 1024
     num_threads: 4
     shuffle: False
+#    vis_epoch: 290 # start ploting after this epoch
 
 ## optimizer settings
 optimizer:
@@ -208,7 +103,7 @@ optimizer:
     weight_decay: 0.0
     # for SGD
     momentum: 0.9
-    # learning rate decay
+    # learning rate will decay at each milestone epoch
     milestones: [50, 100, 150, 250]
     gamma: 0.5
 

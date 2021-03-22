@@ -1,7 +1,6 @@
 #/*
 **/__pycache__
 .spyproject/
-*.yml
 *.log
 *.ini
 *.bak

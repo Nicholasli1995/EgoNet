@@ -1,13 +1,15 @@
 """
-Warm-up pre-training of the sub-module \mathcal{L}() that predicts 3D cuboid 
+Pre-training of the sub-network \mathcal{L}() that predicts 3D cuboid 
 given 2D screen coordinates as input.
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
+import sys
+sys.path.append('../')
 
 import libs.arguments.parse as parse
 import libs.logger.logger as liblogger
-# Apolloscape dataset
+# Deprecated: Apolloscape dataset
 #import libs.dataset.ApolloScape.car_instance as car_instance
 # KITTI dataset
 import libs.dataset.KITTI.car_instance as car_instance
@@ -32,11 +34,13 @@ def main():
 
     # load datasets
     train_dataset, eval_dataset = car_instance.prepare_data(cfgs, logger)
+    logger.info("Finished preparing datasets...")
     
     # training
     if cfgs['train']:
         record = trainer.train_cascade(train_dataset, eval_dataset, cfgs, logger)
         cascade = record['cascade']
+        
     if cfgs['save'] and 'cascade' in locals():
         if 'save_name' in cfgs:
             # save the cascaded model
@@ -59,8 +63,10 @@ def main():
         cascade = torch.load(cfgs['load_model_path'])        
         if cfgs['use_gpu']:
             cascade.cuda()
+            
     if cfgs['evaluate']:   
         trainer.evaluate_cascade(cascade, eval_dataset, cfgs) 
+        
     return record
 
 if __name__ == "__main__":

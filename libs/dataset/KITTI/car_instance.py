@@ -620,7 +620,7 @@ class KITTI(bc.SupervisedDataset):
             raise NotImplementedError('Undefined input representation.')
         # output representation
         if out_rep == 'R3d+T':
-            # R stands for root, T stands for translation
+            # R3D stands for relative 3D shape, T stands for translation
             # center the camera coordinates to remove depth
             output_list = []
             for i in range(len(p3d)):
@@ -629,7 +629,7 @@ class KITTI(bc.SupervisedDataset):
                 relative_shape = p3d[i][1:, :] - root
                 output = np.concatenate([root, relative_shape], axis=0)
                 output_list.append(output.reshape(1, -1)) 
-        elif out_rep == 'R3d':
+        elif out_rep == 'R3d': # relative 3D shape
             output_list = []
             # save a copy of the 3D object roots
             if not hasattr(self, 'root_list'):
@@ -719,7 +719,7 @@ class KITTI(bc.SupervisedDataset):
 #            y *= (1 + np.random.randn()*0.05)
 #            z *= (1 + np.random.randn()*0.1)
             if self.split == 'train' and self.exp_type == '2dto3d' and not self._inference_mode:
-                ry += np.random.randn()*np.pi
+                ry += np.random.randn()*np.pi # random perturbation
             # END TEMPORAL TESTING
             rot_maty = np.array([[np.cos(ry), 0, np.sin(ry)],
                                 [0, 1, 0],
@@ -991,7 +991,7 @@ class KITTI(bc.SupervisedDataset):
         path_list = self._data_config['image_path_list']
         kpt_3d_style = self._data_config['3d_kpt_sample_style']
         in_rep = self._data_config['lft_in_rep']
-        out_rep = self._data_config['lft_out_rep'] # R3d encodes 3D rotation
+        out_rep = self._data_config['lft_out_rep'] # R3d (Relative 3D shape) encodes 3D rotation
         input_list = []
         output_list = []
         id_list = []
