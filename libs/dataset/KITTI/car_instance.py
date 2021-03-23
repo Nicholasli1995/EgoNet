@@ -1263,13 +1263,25 @@ def collate_dict(dict_list):
     return ret
 
 def length_limit(instances, targets, target_weights, meta):
-    if len(instances) > MAX_INS_CNT:
-        chosen = np.random.choice(len(instances), MAX_INS_CNT, replace=False)[:MAX_INS_CNT]
+    if len(instances) > MAX_INS_CNT and len(instances) == len(targets):
+        # normal training
+        chosen = np.random.choice(len(instances), MAX_INS_CNT, replace=False)
         ins, tar, tw, = instances[chosen], targets[chosen], target_weights[chosen]
         m = {'path':meta['path']}
         for key in meta:
             if key != 'path':
                 m[key] = meta[key][chosen]
+    elif len(instances) > MAX_INS_CNT and len(instances) > len(targets) and meta['fs_instance_cnt'] > MAX_INS_CNT:
+        # mixed training: fully-supervised instances are too many
+        chosen = np.random.choice(meta['fs_instance_cnt'], MAX_INS_CNT, replace=False)
+        ins, tar, tw, = instances[chosen], targets[chosen], target_weights[chosen]
+        m = {'path':meta['path']}
+        for key in meta:
+            if key != 'path' and key != 'fs_instance_cnt':
+                m[key] = meta[key][chosen]
+    elif len(instances) > MAX_INS_CNT and len(instances) > len(targets) and meta['fs_instance_cnt'] <= MAX_INS_CNT:
+        # mixed training: self-supervised instances are too many
+        ins, tar, tw, m = instances[:MAX_INS_CNT], targets, target_weights, meta
     else:
         ins, tar, tw, m = instances, targets, target_weights, meta
     return ins, tar, tw, m
