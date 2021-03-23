@@ -27,6 +27,8 @@ from os.path import sep as osep
 from os.path import exists
 from os import listdir 
 
+# maximum number of inputs to the network depending on your GPU memory
+MAX_INS_CNT = 140
 TYPE_ID_CONVERSION = {
     'Car': 0,
     'Cyclist': 1,
@@ -1260,6 +1262,18 @@ def collate_dict(dict_list):
         ret[key] = np.concatenate([d[key] for d in dict_list], axis=0)
     return ret
 
+def length_limit(instances, targets, target_weights, meta):
+    if len(instances) > MAX_INS_CNT:
+        chosen = np.random.choice(len(instances), MAX_INS_CNT, replace=False)[:MAX_INS_CNT]
+        ins, tar, tw, = instances[chosen], targets[chosen], target_weights[chosen]
+        m = {'path':meta['path']}
+        for key in meta:
+            if key != 'path':
+                m[key] = meta[key][chosen]
+    else:
+        ins, tar, tw, m = instances, targets, target_weights, meta
+    return ins, tar, tw, m
+
 def my_collate_fn(batch):
     # the collate function for 2d pose training
     instances, targets, target_weights, meta = list(zip(*batch))
@@ -1283,4 +1297,4 @@ def my_collate_fn(batch):
     else:
         #dummy weight
         target_weights = torch.ones(1)
-    return instances, targets, target_weights, meta
+    return length_limit(instances, targets, target_weights, meta)

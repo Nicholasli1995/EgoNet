@@ -55,9 +55,11 @@ def train(model, model_settings, GPUs, cfgs, logger, final_output_dir):
     model = torch.nn.DataParallel(model, device_ids=GPUs).cuda()
 
     # import time
-    # dump_input = torch.rand((1, input_channels, input_size[1], input_size[0])).cuda()
+    # dump_input = torch.rand((64, input_channels, input_size[1], input_size[0])).cuda()
     # t1 = time.clock()
     # out = model(dump_input)
+    # l = out[0].sum()
+    # l.backward()
     # torch.cuda.synchronize()
     # print(time.clock() - t1)
     # return
