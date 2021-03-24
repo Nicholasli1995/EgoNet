@@ -29,6 +29,7 @@ from os import listdir
 
 # maximum number of inputs to the network depending on your GPU memory
 MAX_INS_CNT = 140
+#MAX_INS_CNT = 64
 TYPE_ID_CONVERSION = {
     'Car': 0,
     'Cyclist': 1,
@@ -1082,7 +1083,8 @@ class KITTI(bc.SupervisedDataset):
         # cnt: number of fully supervised samples
         extract_cnt = self.ss_settings['max_per_img'] - cnt
         if extract_cnt <= 0:
-            return torch.zeros(0, 3, 256, 256), None, None, None
+            num_channel = 5 if self.hm_para['add_xy'] else 3
+            return torch.zeros(0, num_channel, 256, 256), None, None, None
         idx = np.random.randint(0, len(self.ss_record['paths']))
         parameters = self.hm_para
         parameters['boxes'] = self.ss_record['boxes'][idx]
