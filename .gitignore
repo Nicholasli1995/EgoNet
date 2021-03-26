@@ -9,4 +9,5 @@
 *.jpg
 *.png
 *.pdf
+/tools/kitti-eval/evaluate_object_3d_offline
 
