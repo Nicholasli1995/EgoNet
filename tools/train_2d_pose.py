@@ -122,10 +122,7 @@ def evaluate(model, model_settings, GPUs, cfgs, logger, final_output_dir, eval_t
     model = torch.nn.DataParallel(model, device_ids=GPUs).cuda()
     evaluator = Evaluator(cfgs['testing_settings']['eval_metrics'], cfgs)
     # define loss function (criterion) and optimizer
-    loss_type = model_settings['loss_type']
-    loss_func = eval('loss_func.' + loss_type)(
-        use_target_weight=cfgs['training_settings']['use_target_weight']
-        ).cuda()
+    loss_func = choose_loss_func(model_settings, cfgs)
     # dataset preparation
     data_cfgs = cfgs['dataset']
     train_dataset, valid_dataset = eval('dataset.' + data_cfgs['name'] + 
