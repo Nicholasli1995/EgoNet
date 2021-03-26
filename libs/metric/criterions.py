@@ -78,7 +78,7 @@ def get_distance_src(output,
     elif isinstance(output, np.ndarray) or isinstance(output, torch.Tensor) and arg_max == 'hard':
         if not isinstance(output, np.ndarray):
             output = output.data.cpu().numpy()        
-        pred, max_vals = lip.soft_arg_max_np(output)
+        pred, max_vals = lip.get_max_preds(output)
     else:
         raise NotImplementedError
     image_size = image_size if cfgs is None else cfgs['heatmapModel']['input_size']

@@ -116,24 +116,26 @@ def train(model, model_settings, GPUs, cfgs, logger, final_output_dir):
     torch.save(model.module.state_dict(), final_model_state_file)
     return
 
-def evaluate(model, model_settings, GPUs, cfgs, logger, final_output_dir):
+def evaluate(model, model_settings, GPUs, cfgs, logger, final_output_dir, eval_train=False):
     saved_path = cfgs['dirs']['load_hm_model']
     model.load_state_dict(torch.load(saved_path))
     model = torch.nn.DataParallel(model, device_ids=GPUs).cuda()
     evaluator = Evaluator(cfgs['testing_settings']['eval_metrics'], cfgs)
     # define loss function (criterion) and optimizer
     loss_type = model_settings['loss_type']
-    criterion = eval('loss_func.' + loss_type)(
+    loss_func = eval('loss_func.' + loss_type)(
         use_target_weight=cfgs['training_settings']['use_target_weight']
         ).cuda()
     # dataset preparation
     data_cfgs = cfgs['dataset']
     train_dataset, valid_dataset = eval('dataset.' + data_cfgs['name'] + 
                                         '.car_instance').prepare_data(cfgs, logger)
+    collate_fn = valid_dataset.get_collate_fn()
     logger.info("Evaluation on the validation split:")
-    trainer.evaluate(valid_dataset, model, criterion, cfgs, logger, evaluator)    
-    logger.info("Evaluation on the training split:")
-    trainer.evaluate(train_dataset, model, criterion, cfgs, logger, evaluator)
+    trainer.evaluate(valid_dataset, model, loss_func, cfgs, logger, evaluator, collate_fn=collate_fn)    
+    if eval_train:
+        logger.info("Evaluation on the training split:")
+        trainer.evaluate(train_dataset, model, loss_func, cfgs, logger, evaluator)
     return
 
 def main():
@@ -161,7 +163,7 @@ def main():
     model_settings = cfgs['heatmapModel']
     model_name = model_settings['name']
     method_str = 'models.heatmapModel' + '.' + model_name + '.get_pose_net'
-    model = eval(method_str)(cfgs, is_train=True)
+    model = eval(method_str)(cfgs, is_train=cfgs['train'])
 
     if cfgs['train']:
         train(model, model_settings, GPUs, cfgs, logger, final_output_dir)
