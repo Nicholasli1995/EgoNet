@@ -198,7 +198,8 @@ def crop_single_instance(data_numpy, bbox, joints, parameters, pth_trans=None):
     if parameters['jitter_bbox']:
         bbox, joints = jitter_bbox_with_kpts_no_occlu(bbox, 
                                                       joints,
-                                                      parameters['jitter_params'])
+                                                      parameters['jitter_params']
+                                                      )
     joints_vis = joints[:, 2]
     if parameters['resize']:
         ret = resize_bbox(bbox[0], bbox[1], bbox[2], bbox[3], 
@@ -207,11 +208,11 @@ def crop_single_instance(data_numpy, bbox, joints, parameters, pth_trans=None):
     else:
         c, s = bbox2cs(bbox)    
     trans = get_affine_transform(c, s, 0.0, reso)
-    input = cv2.warpAffine(
-        data_numpy,
-        trans,
-        (int(reso[0]), int(reso[1])),
-        flags=cv2.INTER_LINEAR)
+    input = cv2.warpAffine(data_numpy,
+                           trans,
+                           (int(reso[0]), int(reso[1])),
+                           flags=cv2.INTER_LINEAR
+                           )
     # add two more channels to encode object location
     if parameters['add_xy']:
         xymap = generate_xy_map(ret['bbox'], reso, parameters['global_size'])

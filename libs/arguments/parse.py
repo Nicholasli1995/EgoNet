@@ -26,5 +26,6 @@ def parse_args():
                         type=str
                         )
     args, unknown = parser.parse_known_args()
-    configs = read_yaml_file(args.cfg)         
+    configs = read_yaml_file(args.cfg)   
+    configs['config_path'] = args.cfg      
     return configs

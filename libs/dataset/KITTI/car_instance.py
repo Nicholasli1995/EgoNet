@@ -437,7 +437,7 @@ class KITTI(bc.SupervisedDataset):
         """
         file_list = listdir(path)  
         record_dict = {}
-        
+        use_raw_bbox = True if self.split == 'test' else False
         for file_name in file_list:
             assert file_name.endswith(".txt")
             image_name = file_name[:-4] + ".png"
@@ -445,7 +445,7 @@ class KITTI(bc.SupervisedDataset):
             self.read_single_file(image_name, 
                                   record_dict, 
                                   label_path=label_path,
-                                  use_raw_bbox=False
+                                  use_raw_bbox=use_raw_bbox
                                   )
         
         return record_dict
