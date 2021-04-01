@@ -1,3 +1,4 @@
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/exploring-intermediate-representation-for/vehicle-pose-estimation-on-kitti-cars-hard)](https://paperswithcode.com/sota/vehicle-pose-estimation-on-kitti-cars-hard?p=exploring-intermediate-representation-for)
 # EgoNet
 Official project website for the CVPR 2021 paper "Exploring intermediate representation for monocular vehicle pose estimation"
 
