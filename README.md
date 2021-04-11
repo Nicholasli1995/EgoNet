@@ -34,7 +34,14 @@ This repository is under preparation. Inference code and pre-trained models are 
 |[MonoDLE](https://github.com/xinzhuma/monodle)|CVPR 2021|Monocular|93.46| 90.23| 80.11|
 |Ours           |CVPR 2021 |Monocular|**96.11**|**91.23**|**80.96**|
 
-## Reference
+## Inference/Deployment
+Coming soon.
+
+## Training
+To be updated.
+
+## Citation
+Please star this repository and cite the following paper in your publications if it helps your research:
 
     @InProceedings{Li_2021_CVPR,
     author = {Li, Shichao and Yan, Zengqiang and Li, Hongyang and Cheng, Kwang-Ting},
@@ -43,3 +50,12 @@ This repository is under preparation. Inference code and pre-trained models are 
     month = {June},
     year = {2021}
     }
+
+## License
+This repository can be used freely for non-commercial purposes. Contact me if you are interested in a commercial license.
+
+Link to the paper:
+[Exploring intermediate representation for monocular vehicle pose estimation](https://arxiv.org/abs/2011.08464)
+
+Link to the presentation video:
+To be added.
