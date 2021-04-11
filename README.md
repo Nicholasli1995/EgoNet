@@ -21,6 +21,19 @@ This repository is under preparation. Inference code and pre-trained models are 
 |[MonoDLE](https://github.com/xinzhuma/monodle)|CVPR 2021|24.97| 19.33| 17.01|
 |Ours           |CVPR 2021 |**33.60**|**25.38**|**22.80**|
 
+## Performance: AOS@R<sub>40</sub> on KITTI test set (RGB)
+
+| Method                    | Reference|Configuration|Easy|Moderate|Hard|
+| ------------------------- | ---------------| --------------| --------------| --------------| --------------| 
+|[M3D-RPN](https://arxiv.org/abs/1907.06038)|ICCV 2019|Monocular|88.38 |82.81| 67.08|
+|[DSGN](https://github.com/Jia-Research-Lab/DSGN)|CVPR 2020|Stereo|95.42|86.03| 78.27|
+|[Disp-RCNN](https://github.com/zju3dv/disprcnn)|CVPR 2020|Stereo |93.02 |	81.70 |	67.16|
+|[MonoPair](https://arxiv.org/abs/2003.00504)|CVPR 2020|Monocular|91.65 |86.11 |76.45|
+|[D4LCN](https://github.com/dingmyu/D4LCN)|CVPR 2020|Monocular|90.01|82.08| 63.98|
+|[Kinematic3D](https://arxiv.org/abs/2007.09548)|ECCV 2020|Monocular|58.33 |	45.50 |	34.81|
+|[MonoDLE](https://github.com/xinzhuma/monodle)|CVPR 2021|Monocular|93.46| 90.23| 80.11|
+|Ours           |CVPR 2021 |Monocular|**96.11**|**91.23**|**80.96**|
+
 ## Reference
 
     @InProceedings{Li_2021_CVPR,
