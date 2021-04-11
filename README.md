@@ -32,7 +32,7 @@ This repository is under preparation. Inference code and pre-trained models are 
 |[D4LCN](https://github.com/dingmyu/D4LCN)|CVPR 2020|Monocular|90.01|82.08| 63.98|
 |[Kinematic3D](https://arxiv.org/abs/2007.09548)|ECCV 2020|Monocular|58.33 |	45.50 |	34.81|
 |[MonoDLE](https://github.com/xinzhuma/monodle)|CVPR 2021|Monocular|93.46| 90.23| 80.11|
-|Ours           |CVPR 2021 |Monocular|**96.11**|**91.23**|**80.96**|
+|[Ours](http://www.cvlibs.net/datasets/kitti/eval_object_detail.php?&result=e5233225fd5ef36fa63eb00252d9c00024961f2c)           |CVPR 2021 |Monocular|**96.11**|**91.23**|**80.96**|
 
 ## Inference/Deployment
 Coming soon.
