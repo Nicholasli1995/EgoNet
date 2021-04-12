@@ -56,8 +56,6 @@ const double MIN_OVERLAP[3][3] = {{0.7, 0.5, 0.5}, {0.7, 0.5, 0.5}, {0.7, 0.5, 0
 
 // no. of recall steps that should be evaluated (discretized)
 const double N_SAMPLE_PTS = 41;
-// the old metric is this one??
-//const double N_SAMPLE_PTS = 11;
 
 // initialize class names
 void initGlobals () {

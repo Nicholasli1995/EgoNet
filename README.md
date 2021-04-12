@@ -8,7 +8,7 @@ This repository is under preparation. Inference code and pre-trained models are 
   <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/teaser.jpg"  width="830" height="200" />
 </p>
 
-## Performance: AP<sup>BEV</sup>@R<sub>40</sub> on KITTI val set (monocular RGB)
+## Performance: AP<sup>BEV</sup>@R<sub>40</sub> on KITTI val set for Car (monocular RGB)
 
 | Method                    | Reference|Easy|Moderate|Hard|
 | ------------------------- | ---------------| --------------| --------------| --------------| 
@@ -21,7 +21,7 @@ This repository is under preparation. Inference code and pre-trained models are 
 |[MonoDLE](https://github.com/xinzhuma/monodle)|CVPR 2021|24.97| 19.33| 17.01|
 |Ours           |CVPR 2021 |**33.60**|**25.38**|**22.80**|
 
-## Performance: AOS@R<sub>40</sub> on KITTI test set (RGB)
+## Performance: AOS@R<sub>40</sub> on KITTI test set for Car (RGB)
 
 | Method                    | Reference|Configuration|Easy|Moderate|Hard|
 | ------------------------- | ---------------| --------------| --------------| --------------| --------------| 
