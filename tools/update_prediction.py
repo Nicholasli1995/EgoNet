@@ -10,14 +10,12 @@ sys.path.append('../')
 import libs.arguments.parse as parse
 import libs.logger.logger as liblogger
 import libs.dataset as dataset
-#import libs.dataset.ApolloScape.car_instance
 import libs.dataset.KITTI.car_instance
 import libs.model as models
 import libs.model.FCmodel as FCmodel
 import libs.dataset.normalization.operations as nop
 import libs.visualization.points as vp
 import libs.common.transformation as ltr
-#import libs.dataset.ApolloScape.car_models as car_models
 
 from libs.common.img_proc import resize_bbox, get_affine_transform, get_max_preds, generate_xy_map
 from libs.common.img_proc import affine_transform_modified, cs2bbox, simple_crop, enlarge_bbox
@@ -35,7 +33,9 @@ from scipy.spatial.transform import Rotation
 from copy import deepcopy
 
 def prepare_models(cfgs, is_cuda=True):
-    # initialize the required models
+    """
+    Initialize and load Ego-Net given a configuration file.
+    """
     hm_model_settings = cfgs['heatmapModel']
     hm_model_name = hm_model_settings['name']
     method_str = 'models.heatmapModel.' + hm_model_name + '.get_pose_net'
@@ -65,6 +65,9 @@ def modify_bbox(bbox, target_ar, enlarge=1.1):
     return ret
 
 def crop_single_instance(img, bbox, resolution, pth_trans=None, xy_dict=None):
+    """
+    Crop a single instance given an image and bounding box.
+    """
     bbox = to_npy(bbox)
     target_ar = resolution[0] / resolution[1]
     ret = modify_bbox(bbox, target_ar)
@@ -91,6 +94,9 @@ def crop_instances(annot_dict,
                    rgb=True,
                    xy_dict=None
                    ):
+    """
+    Crop input instances given an annotation dictionary.
+    """
     all_instances = []
     # each record describes one instance
     all_records = []
@@ -147,6 +153,9 @@ def get_keypoints(instances,
                   arg_max='hard',
                   is_cuda=True
                   ):
+    """
+    Foward pass to obtain the screen coordinates.
+    """
     if is_cuda:
         instances = instances.cuda()
     output = model(instances)
@@ -200,6 +209,9 @@ def get_keypoints(instances,
     return ret
 
 def kpts_to_euler(template, prediction):
+    """
+    Convert the predicted cuboid representation to euler angles.
+    """    
     # estimate roll, pitch, yaw of the prediction by comparing with a 
     # reference bounding box
     # prediction and template of shape [3, N_points]
@@ -210,22 +222,10 @@ def kpts_to_euler(template, prediction):
     angles = angles[[1,0,2]]
     return angles, T
 
-# def test_angle_conversion(dataset_obj, template):
-#     camera_coordinates = []
-#     scale = np.ones((3, ))
-#     car_id = np.random.randint(0, 78)
-#     car_name = car_models.car_id2name[car_id].name  
-#     car = dataset_obj.car_models[car_name]            
-#     pose = np.random.rand(6)
-#     points = dataset_obj.select_points(car['vertices'], style='bbox9')
-#     dataset_obj.get_cam_cord(camera_coordinates, pose, scale, points,
-#                       augment=False, times=1)    
-#     angles, T = kpts_to_euler(template.T, camera_coordinates[0].T)
-#     error = angles - pose[:3]*180/np.pi
-#     print('The conversion error is ', error)
-#     return 
-
 def get_template(prediction, interp_coef=[0.332, 0.667]):
+    """
+    Construct a template 3D cuboid used for computing regid transformation.
+    """ 
     parents = prediction[interp_dict['bbox12'][0]]
     children = prediction[interp_dict['bbox12'][1]]
     lines = parents - children
@@ -250,8 +250,10 @@ def get_template(prediction, interp_coef=[0.332, 0.667]):
     return corners_3d
 
 def get_observation_angle_trans(euler_angles, translations):
-    # convert orientation in camera coordinate into local coordinate system
-    # utilizing known object location (translation)
+    """
+    Convert orientation in camera coordinate into local coordinate system
+    utilizing known object location (translation)
+    """ 
     alphas = euler_angles[:,1].copy()
     for idx in range(len(euler_angles)):
         ry3d = euler_angles[idx][1] # orientation in the camera coordinate system
@@ -264,8 +266,10 @@ def get_observation_angle_trans(euler_angles, translations):
     return alphas
 
 def get_observation_angle_proj(euler_angles, kpts, K):
-    # convert orientation in camera coordinate into local coordinate system
-    # utilizing the projection of object on the image plane
+    """
+    Convert orientation in camera coordinate into local coordinate system
+    utilizing the projection of object on the image plane
+    """ 
     f = K[0,0]
     cx = K[0,2]
     kpts_x = [kpts[i][0,0] for i in range(len(kpts))]
@@ -311,6 +315,9 @@ def format_str_submission(roll, pitch, yaw, x, y, z, score):
     return tempt_str
 
 def get_instance_str(dic):
+    """
+    Produce KITTI style prediction string for one instance.
+    """     
     string = ""
     string += dic['class'] + " "
     string += "{:.1f} ".format(dic['truncation'])
@@ -321,9 +328,9 @@ def get_instance_str(dic):
     string += "{:.6f} {:.6f} {:.6f} ".format(dic['locations'][0], dic['locations'][1], dic['locations'][2])
     string += "{:.6f} ".format(dic['rot_y'])
     if 'score' in dic:
-        string += "{:.6f} ".format(dic['score'])
+        string += "{:.8f} ".format(dic['score'])
     else:
-        string += "{:.6f} ".format(1.0)
+        string += "{:.8f} ".format(1.0)
     return string
 
 def get_pred_str(record):
@@ -790,7 +797,7 @@ def my_collate_fn(batch):
     meta = collate_dict(meta)
     return imgs, meta
 
-def filter_conf(record, thres=0.1):
+def filter_conf(record, thres=0.0):
     annots = record['raw_txt_format']
     indices = [i for i in range(len(annots)) if annots[i]['score'] >= thres]
     if len(indices) == 0:
