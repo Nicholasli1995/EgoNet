@@ -409,11 +409,13 @@ def process_batch(images,
                   threshold=None,
                   xy_dict=None
                   ):
+    """
+    Process a batch of images.
     # annot_dict is a Python dictionary storing
     # keys: 
     #       path: list of image paths
     #       boxes: list of bounding boxes for each image
-    
+    """
     all_instances, all_records = crop_instances(annot_dict, 
                                                 resolution=(256, 256),
                                                 pth_trans=pth_trans,
@@ -446,13 +448,22 @@ def process_batch(images,
     return records
 
 def to_npy(tensor):
+    """
+    Convert PyTorch tensor to numpy array.
+    """
     if isinstance(tensor, np.ndarray):
         return tensor
     else:
         return tensor.data.cpu().numpy()
 
-def refine_with_perfect_size(pred, observation, intrinsics, dist_coeffs, gts, 
-                             threshold=5., ax=None):
+def refine_with_perfect_size(pred, 
+                             observation, 
+                             intrinsics, 
+                             dist_coeffs, 
+                             gts, 
+                             threshold=5., 
+                             ax=None
+                             ):
     # Use the gt 3D box size for refinement to show the performance gain with 
     # size regression.
     # If there is a nearby ground truth bbox, use its size.
@@ -486,8 +497,14 @@ def refine_with_perfect_size(pred, observation, intrinsics, dist_coeffs, gts,
                           linestyle='-.')         
         return True, refined_prediction
 
-def refine_with_predicted_bbox(pred, observation, intrinsics, dist_coeffs, 
-                               gts=None, threshold=5., ax=None):
+def refine_with_predicted_bbox(pred, 
+                               observation, 
+                               intrinsics, 
+                               dist_coeffs, 
+                               gts=None, 
+                               threshold=5., 
+                               ax=None
+                               ):
     tempt_box_pred = pred.copy()
     tempt_box_pred[1:, :] += tempt_box_pred[0, :].reshape(1, 3)
     # use the predicted 3D bounding box size for refinement
@@ -557,6 +574,10 @@ def gather_lifting_results(record,
                            get_str=False,
                            alpha_mode='trans'
                            ):
+    """
+    Lift Screen coordinates to 3D representation and a optimization-based 
+    refinement is optional.
+    """
     if target is not None:
         p3d_gt = target.reshape(len(target), -1, 3)
     else:
@@ -636,6 +657,9 @@ def gather_lifting_results(record,
     return record
 
 def save_txt_file(img_path, prediction, params):
+    """
+    Save a txt file for predictions of an image.
+    """    
     if not params['flag']:
         return
     file_name = img_path.split('/')[-1][:-3] + 'txt'
@@ -659,6 +683,9 @@ def refine_one_image(img_path,
                                 },
                      alpha_mode='trans'
                      ):
+    """
+    Refine the predictions from a single image.
+    """
     # plot 2D predictions 
     if visualize:
         if 'plots' in record:
@@ -798,6 +825,9 @@ def my_collate_fn(batch):
     return imgs, meta
 
 def filter_conf(record, thres=0.0):
+    """
+    Filter the proposals with a confidence threshold.
+    """
     annots = record['raw_txt_format']
     indices = [i for i in range(len(annots)) if annots[i]['score'] >= thres]
     if len(indices) == 0:
@@ -812,7 +842,9 @@ def filter_conf(record, thres=0.0):
     return True, filterd_record
 
 def gather_dict(request, references, filter_c=True):
-    # gather a dict from reference as requsted
+    """
+    Gather a dict from reference as requsted.
+    """
     assert 'path' in request
     ret = {'path':[], 
            'boxes':[], 
@@ -850,6 +882,9 @@ def gather_dict(request, references, filter_c=True):
     
 @torch.no_grad()
 def inference(testset, model_settings, results, cfgs):
+    """
+    The main inference function.
+    """
     # visualize to plot the 2D detection and 3D scene reconstruction
     data_loader = get_loader(testset, cfgs, 'testing', collate_fn=my_collate_fn)          
     hm_regressor = model_settings['heatmap_regression']
@@ -941,6 +976,9 @@ def inference(testset, model_settings, results, cfgs):
     return
 
 def generate_empty_file(output_dir, label_dir):
+    """
+    Generate empty files for images without any predictions.
+    """    
     all_files = os.listdir(label_dir)
     detected = os.listdir(os.path.join(output_dir, 'data'))
     for file_name in all_files:
