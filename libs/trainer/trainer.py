@@ -82,8 +82,16 @@ def train_cascade(train_dataset, valid_dataset, cfgs, logger):
         del stage_model    
     return {'cascade':cascade, 'record':stage_record}
 
-def evaluate_cascade(cascade, eval_dataset, stats, opt, save = False, save_path = None,
-                     action_wise = False, action_eval_list = None, apply_dropout=False):
+def evaluate_cascade(cascade, 
+                     eval_dataset, 
+                     stats, 
+                     opt, 
+                     save=False, 
+                     save_path=None,
+                     action_wise=False, 
+                     action_eval_list=None, 
+                     apply_dropout=False
+                     ):
     loss, distance = None, None
     for stage_id in range(len(cascade)):
         # initialize the model
@@ -93,8 +101,16 @@ def evaluate_cascade(cascade, eval_dataset, stats, opt, save = False, save_path 
             stage_model = stage_model.cuda()
         
         # evaluate the model
-        loss, distance = evaluate(eval_dataset, stage_model, stats, opt, save=save, save_path=save_path,
-                 procrustes=False, per_joint=True, apply_dropout=apply_dropout)
+        loss, distance = evaluate(eval_dataset, 
+                                  stage_model, 
+                                  stats, 
+                                  opt, 
+                                  save=save, 
+                                  save_path=save_path,
+                                  procrustes=False, 
+                                  per_joint=True, 
+                                  apply_dropout=apply_dropout
+                                  )
 
         # update datasets
         eval_dataset.stage_update(stage_model, stats, opt)
@@ -355,7 +371,8 @@ def visualize_lifting_results(data,
                       refined_prediction[:, 1:].T, 
                       vp.plot_3d_bbox.connections, 
                       dimension=3, 
-                      c='g')
+                      c='g'
+                      )
         # use the gt 3D box size for refinement
         # first align a box with gt size with the predicted box, then refine
         if target is None:
@@ -369,12 +386,14 @@ def visualize_lifting_results(data,
                       pseudo_box[:, 1:].T, 
                       vp.plot_3d_bbox.connections, 
                       dimension=3, 
-                      c='y')         
+                      c='y'
+                      )         
         vp.plot_lines(ax, 
                       refined_prediction2[:, 1:].T, 
                       vp.plot_3d_bbox.connections, 
                       dimension=3, 
-                      c='b')        
+                      c='b'
+                      )        
     return
 
 def evaluate(eval_dataset, 

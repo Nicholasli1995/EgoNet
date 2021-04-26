@@ -38,9 +38,20 @@ def set_3d_axe_limits(ax, points=None, center=None, radius=None, ratio=1.2):
     ax.set_zlim3d([-radius+zroot, radius+zroot])    
     return
 
-def plot_3d_points(ax, points, indices=None, center=None, radius=None,  
-                   add_labels=True, display_ticks=True, remove_planes=[],
-                   marker='o', color='k', size=50, alpha=1, set_limits=False):
+def plot_3d_points(ax, 
+                   points, 
+                   indices=None, 
+                   center=None, 
+                   radius=None,  
+                   add_labels=True, 
+                   display_ticks=True, 
+                   remove_planes=[],
+                   marker='o', 
+                   color='k', 
+                   size=50, 
+                   alpha=1, 
+                   set_limits=False
+                   ):
     # points of shape [3*N_points] or [N_points, 3]
     points = check_points(points, dimension=3)
     points = points[indices,:] if indices is not None else points
@@ -72,7 +83,16 @@ def plot_3d_points(ax, points, indices=None, center=None, radius=None,
     plt.show()
     return
 
-def plot_lines(ax, points, connections, dimension, lw=4, c='k', linestyle='-', alpha=0.8, add_index=False):
+def plot_lines(ax, 
+               points, 
+               connections, 
+               dimension, 
+               lw=4, 
+               c='k', 
+               linestyle='-', 
+               alpha=0.8, 
+               add_index=False
+               ):
     # connections of shape [n_lines, 2]
     points = check_points(points, dimension)
     if add_index:
@@ -107,8 +127,12 @@ def plot_mesh(ax, vertices, faces, color='grey'):
                     color=color)    
     return
 
-def plot_3d_coordinate_system(ax, origin, system, length=300, 
-                              colors=['r', 'g', 'b']):
+def plot_3d_coordinate_system(ax, 
+                              origin, 
+                              system, 
+                              length=300, 
+                              colors=['r', 'g', 'b']
+                              ):
     # draw a coordinate system at a specified origin
     origin = origin.reshape(3, 1)
     start_points = np.repeat(origin, 3, axis=1)
@@ -120,12 +144,23 @@ def plot_3d_coordinate_system(ax, origin, system, length=300,
                    dimension=3, c=colors[i])
     return
 
-def plot_3d_bbox(ax, bbox_3d_projected, color=None, linestyle='-', add_index=False):
+def plot_3d_bbox(ax, 
+                 bbox_3d_projected, 
+                 color=None, 
+                 linestyle='-', 
+                 add_index=False
+                 ):
     c = np.random.rand(3) if color is None else color
     plot_lines(ax, bbox_3d_projected, plot_3d_bbox.connections, dimension=2, c=c, linestyle=linestyle, add_index=add_index)
     return
 
-def plot_2d_bbox(ax, bbox_2d, color=None, score=None, label=None, linestyle='-'):
+def plot_2d_bbox(ax, 
+                 bbox_2d, 
+                 color=None, 
+                 score=None, 
+                 label=None, 
+                 linestyle='-'
+                 ):
     # bbox_2d in the format [x1, y1, x2, y2]
     c = np.random.rand(3) if color is None else color
     x1, y1, x2, y2 = bbox_2d[0], bbox_2d[1], bbox_2d[2], bbox_2d[3],
@@ -152,9 +187,13 @@ def plot_comparison_relative(points_pred, points_gt):
         gt_bbox = get_bbox_3d(gt)
         plot_lines(ax, pred_bbox, plot_3d_bbox.connections, dimension=3, c='r')
         plot_lines(ax, gt_bbox, plot_3d_bbox.connections, dimension=3, c='k')
-        set_3d_axe_limits(ax, np.vstack([pred_bbox.reshape(-1, 3), 
-                                     gt_bbox.reshape(-1, 3)]),
-                          center=np.zeros((1,3)), radius=5.)
+        set_3d_axe_limits(ax, 
+                          np.vstack([pred_bbox.reshape(-1, 3), 
+                                     gt_bbox.reshape(-1, 3)]
+                                    ),
+                          center=np.zeros((1,3)), 
+                          radius=5.
+                          )
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_zlabel("z")    

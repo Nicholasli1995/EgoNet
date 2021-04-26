@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Utilities for saving debugging images.
 Author: Shichao Li
@@ -14,9 +12,18 @@ import numpy as np
 import torchvision
 import cv2
 from os.path import join
-###############################################################################
-def draw_circles(ndarr, xmaps, ymaps, nmaps, batch_joints, batch_joints_vis, 
-                 width, height, padding, color=[255,0,0]):
+
+def draw_circles(ndarr, 
+                 xmaps, 
+                 ymaps, 
+                 nmaps, 
+                 batch_joints, 
+                 batch_joints_vis, 
+                 width, 
+                 height, 
+                 padding, 
+                 color=[255,0,0]
+                 ):
     k = 0
     for y in range(ymaps):
         for x in range(xmaps):
@@ -38,8 +45,12 @@ def draw_circles(ndarr, xmaps, ymaps, nmaps, batch_joints, batch_joints_vis,
     return ndarr
 
 # functions used for debugging heatmap-based keypoint localization model      #
-def save_batch_image_with_joints(batch_image, record_dict, file_name, 
-                                 nrow=8, padding=2):
+def save_batch_image_with_joints(batch_image, 
+                                 record_dict, 
+                                 file_name, 
+                                 nrow=8, 
+                                 padding=2
+                                 ):
     '''
     batch_image: [batch_size, channel, height, width]
     batch_joints: [batch_size, num_joints, 3],
@@ -67,8 +78,11 @@ def save_batch_image_with_joints(batch_image, record_dict, file_name,
     cv2.imwrite(file_name, cv2.cvtColor(ndarr, cv2.COLOR_RGB2BGR))
     return
 
-def save_batch_heatmaps(batch_image, batch_heatmaps, file_name,
-                        normalize=True):
+def save_batch_heatmaps(batch_image, 
+                        batch_heatmaps, 
+                        file_name,
+                        normalize=True
+                        ):
     '''
     batch_image: [batch_size, channel, height, width]
     batch_heatmaps: ['batch_size, num_joints, height, width]
@@ -132,8 +146,16 @@ def save_batch_heatmaps(batch_image, batch_heatmaps, file_name,
     cv2.imwrite(file_name, grid_image)
     return
 
-def save_debug_images(epoch, batch_index, cfgs, input, meta, target, others, 
-                      output, split):
+def save_debug_images(epoch, 
+                      batch_index, 
+                      cfgs, 
+                      input, 
+                      meta, 
+                      target, 
+                      others, 
+                      output, 
+                      split
+                      ):
     if not cfgs['training_settings']['debug']['save']:
         return
     prefix = join(cfgs['dirs']['output'], split, '{}_{}'.format(epoch, batch_index))
