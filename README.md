@@ -50,12 +50,13 @@ Please star this repository and cite the following paper in your publications if
     month = {June},
     year = {2021}
     }
+Related ECCV' 20 work: [GSNet: joint vehicle pose and shape reconstruction with geometrical and scene-aware supervision](https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123600511.pdf)
 
 ## License
 This repository can be used freely for non-commercial purposes. Contact me if you are interested in a commercial license.
 
 Link to the paper:
-[Exploring intermediate representation for monocular vehicle pose estimation](https://arxiv.org/abs/2011.08464)
+[Exploring intermediate representation for monocular vehicle pose estimation](https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123600511.pdf)
 
 Link to the presentation video:
 To be added.
