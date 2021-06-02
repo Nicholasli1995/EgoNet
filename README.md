@@ -59,4 +59,4 @@ Link to the paper:
 [Exploring intermediate representation for monocular vehicle pose estimation](https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123600511.pdf)
 
 Link to the presentation video:
-To be added.
+[Youtube](https://www.youtube.com/watch?v=isKo0F3MU68)
