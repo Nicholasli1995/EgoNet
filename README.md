@@ -56,7 +56,7 @@ Related ECCV' 20 work: [GSNet: joint vehicle pose and shape reconstruction with 
 This repository can be used freely for non-commercial purposes. Contact me if you are interested in a commercial license.
 
 Link to the paper:
-[Exploring intermediate representation for monocular vehicle pose estimation](https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123600511.pdf)
+[Exploring intermediate representation for monocular vehicle pose estimation](https://arxiv.org/abs/2011.08464)
 
 Link to the presentation video:
 [Youtube](https://www.youtube.com/watch?v=isKo0F3MU68)
