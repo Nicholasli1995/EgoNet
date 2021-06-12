@@ -1,8 +1,9 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/exploring-intermediate-representation-for/vehicle-pose-estimation-on-kitti-cars-hard)](https://paperswithcode.com/sota/vehicle-pose-estimation-on-kitti-cars-hard?p=exploring-intermediate-representation-for)
 # EgoNet
-Official project website for the CVPR 2021 paper "Exploring intermediate representation for monocular vehicle pose estimation"
+Official project website for the CVPR 2021 paper "Exploring intermediate representation for monocular vehicle pose estimation". This repo includes an implementation that performs vehicle orientation estimation on the KITTI dataset from a single RGB image. 
 
-This repository is under preparation. Inference code and pre-trained models are coming soon for quick deployment. Training code will be released before the main conference.
+**Check our 5-min video ([Youtube](https://www.youtube.com/watch?v=isKo0F3MU68), [爱奇艺](https://www.iqiyi.com/v_y6lrdy33kg.html)) for an introduction.**
+This repository is under preparation. Training code will be released before the main conference.
 
 <p align="center">
   <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/teaser.jpg"  width="830" height="200" />
@@ -44,19 +45,22 @@ To be updated.
 Please star this repository and cite the following paper in your publications if it helps your research:
 
     @InProceedings{Li_2021_CVPR,
-    author = {Li, Shichao and Yan, Zengqiang and Li, Hongyang and Cheng, Kwang-Ting},
-    title = {Exploring intermediate representation for monocular vehicle pose estimation},
-    booktitle = {The IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-    month = {June},
-    year = {2021}
-    }
-Related ECCV' 20 work: [GSNet: joint vehicle pose and shape reconstruction with geometrical and scene-aware supervision](https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123600511.pdf)
+    author    = {Li, Shichao and Yan, Zengqiang and Li, Hongyang and Cheng, Kwang-Ting},
+    title     = {Exploring intermediate representation for monocular vehicle pose estimation},
+    booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+    month     = {June},
+    year      = {2021},
+    pages     = {1873-1883}
+}
 
 ## License
 This repository can be used freely for non-commercial purposes. Contact me if you are interested in a commercial license.
 
+## Links
 Link to the paper:
 [Exploring intermediate representation for monocular vehicle pose estimation](https://arxiv.org/abs/2011.08464)
 
 Link to the presentation video:
-[Youtube](https://www.youtube.com/watch?v=isKo0F3MU68)
+[Youtube](https://www.youtube.com/watch?v=isKo0F3MU68), [爱奇艺](https://www.iqiyi.com/v_y6lrdy33kg.html)
+
+Relevant ECCV 2020 work: [GSNet](https://github.com/lkeab/gsnet)
