@@ -25,7 +25,8 @@ def prepare_optim(model, cfgs):
         raise NotImplementedError
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, 
                                                      milestones = milestones, 
-                                                     gamma = gamma)
+                                                     gamma = gamma
+                                                     )
     # A scheduler that automatically decreases the learning rate
 #    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
 #                                                           mode='min',

@@ -1183,12 +1183,13 @@ class KITTI(bc.SupervisedDataset):
             parameters = self.hm_para
             parameters['boxes'] = self.annot_2dpose['boxes'][idx]
             images_fs, heatmaps_fs, weights_fs, meta_fs = lip.get_tensor_from_img(img_path, 
-                                                                   parameters, 
-                                                                   joints=kpts,
-                                                                   pth_trans=self.pth_trans,
-                                                                   rf=parameters['rf'],
-                                                                   sf=parameters['sf'],
-                                                                   generate_hm=False)
+                                                                                  parameters, 
+                                                                                  joints=kpts,
+                                                                                  pth_trans=self.pth_trans,
+                                                                                  rf=parameters['rf'],
+                                                                                  sf=parameters['sf'],
+                                                                                  generate_hm=False
+                                                                                  )
             if self.exp_type == 'baselinealpha':
                 targets = [np.array([[np.cos(rots[idx][0]), np.sin(rots[idx][0])]])  for idx in range(len(rots))]
                 meta_fs['angles_gt'] = rots[:, 0]

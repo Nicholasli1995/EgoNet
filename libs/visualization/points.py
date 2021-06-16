@@ -124,7 +124,8 @@ def plot_mesh(ax, vertices, faces, color='grey'):
                     faces, 
                     -vertices[:, 2], 
                     shade=True, 
-                    color=color)    
+                    color=color
+                    )    
     return
 
 def plot_3d_coordinate_system(ax, 
@@ -140,8 +141,12 @@ def plot_3d_coordinate_system(ax,
     end_points = start_points + system*length
     all_points = np.hstack([origin, end_points])
     for i in range(3):
-        plot_lines(ax, all_points.T, plot_3d_coordinate_system.connections[i].reshape(1,2),
-                   dimension=3, c=colors[i])
+        plot_lines(ax, 
+                   all_points.T, 
+                   plot_3d_coordinate_system.connections[i].reshape(1,2),
+                   dimension=3, 
+                   c=colors[i]
+                   )
     return
 
 def plot_3d_bbox(ax, 
@@ -151,7 +156,14 @@ def plot_3d_bbox(ax,
                  add_index=False
                  ):
     c = np.random.rand(3) if color is None else color
-    plot_lines(ax, bbox_3d_projected, plot_3d_bbox.connections, dimension=2, c=c, linestyle=linestyle, add_index=add_index)
+    plot_lines(ax, 
+               bbox_3d_projected, 
+               plot_3d_bbox.connections, 
+               dimension=2, 
+               c=c, 
+               linestyle=linestyle, 
+               add_index=add_index
+               )
     return
 
 def plot_2d_bbox(ax, 

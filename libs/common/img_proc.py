@@ -283,7 +283,8 @@ def get_tensor_from_img(path,
                                                                    bbox,
                                                                    joints[idx],
                                                                    parameters,
-                                                                   pth_trans)
+                                                                   pth_trans
+                                                                   )
             all_inputs.append(input)
             all_centers.append(c)
             all_scales.append(s)

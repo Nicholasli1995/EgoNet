@@ -1,8 +1,6 @@
 """
-Inference of Ego-Net on KITTI dataset.
-
-The user can provide the 3D bounding boxes predicted by other 3D object detectors
-and run Ego-Net to refine the orientation of these instances.
+This is the legacy inference code which includes some debugging functions.
+You don't need to read this file to use Ego-Net.
 """
 import sys
 sys.path.append('../')
@@ -1030,28 +1028,28 @@ def main():
     # logging
     logger, final_output_dir = liblogger.get_logger(cfgs)   
     shutil.copyfile(cfgs['config_path'], os.path.join(final_output_dir, 'saved_config.yml'))
-    
     # Set GPU
     if cfgs['use_gpu'] and torch.cuda.is_available():
         GPUs = cfgs['gpu_id']
     else:
-        raise ValueError('CPU-based inference is not maintained.')
+        logger.info("GPU acceleration is disabled.")
         
     # cudnn related setting
     torch.backends.cudnn.benchmark = cfgs['cudnn']['benchmark']
     torch.backends.cudnn.deterministic = cfgs['cudnn']['deterministic']
     torch.backends.cudnn.enabled = cfgs['cudnn']['enabled']
-    
-    # configurations related to the KITTI dataset
+
     data_cfgs = cfgs['dataset']
     
     # which split to show
-    split = 'valid' # default: KITTI val split
+    split = 'valid'
     dataset_inf = eval('dataset.' + data_cfgs['name']  
                         + '.car_instance').get_dataset(cfgs, logger, split)
-    
     # set to inference mode but does not read image
     dataset_inf.inference([True, False])
+    
+    # some temporary testing
+    # test_angle_conversion(dataset_inf, dataset_inf.instance_stats['ref_box3d'])
     
     # read annotations
     input_file_path = cfgs['dirs']['load_prediction_file']
@@ -1060,16 +1058,15 @@ def main():
     results = {}
     confidence_thres = cfgs['conf_thres']
     
-    # flags: the user can choose to use which type of input bounding boxes to use
-    # use_gt_box can be used to re-produce the experiments simulating perfect 2D detection
+    # flags: use predicted bounding boxes as well as the ground truth boxes
+    # for comparison
     results['flags'] = {}
     results['flags']['pred'] = cfgs['use_pred_box']
     if results['flags']['pred']:
-        # read the predicted boxes as specified by the path
         results['pred'] = dataset_inf.read_predictions(input_file_path)
     results['flags']['gt'] = cfgs['use_gt_box']
     
-    # Initialize Ego-Net and load the pre-trained checkpoint
+    # load checkpoints
     model_dict = prepare_models(cfgs)
     
     # inference and update prediction
@@ -1080,8 +1077,7 @@ def main():
     label_dir = cfgs['dirs']['kitti_label']
     output_dir = os.path.join(cfgs['dirs']['output'], 'submission')
     
-    # When generating submission files for the test split,
-    # if no detections are produced for one image, generate an empty file
+    # if no detections are produced, generate an empty file
     #generate_empty_file(output_dir, label_dir)
     command = "{} {} {}".format(evaluator, label_dir, output_dir)
     # e.g.

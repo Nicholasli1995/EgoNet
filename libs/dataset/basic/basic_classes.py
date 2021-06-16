@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Basic classes for customized dataset classes to inherit.
 Author: Shichao Li
