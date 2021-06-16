@@ -2,8 +2,11 @@
 # EgoNet
 Official project website for the CVPR 2021 paper "Exploring intermediate representation for monocular vehicle pose estimation". This repo includes an implementation that performs vehicle orientation estimation on the KITTI dataset from a single RGB image. 
 
+News:
+
+(2021-06-16): **This repo is under final code cleaning and documentation preparation.** Stay tuned and come back in a week!
+
 **Check our 5-min video ([Youtube](https://www.youtube.com/watch?v=isKo0F3MU68), [爱奇艺](https://www.iqiyi.com/v_y6lrdy33kg.html)) for an introduction.**
-This repository is under preparation. Training code will be released before the main conference.
 
 <p align="center">
   <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/teaser.jpg"  width="830" height="200" />
