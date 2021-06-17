@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Image processing utilities.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
@@ -101,7 +100,6 @@ def simple_crop(input_image, center, crop_size):
     '''
     simple cropping without warping
     '''    
-    # TODO: check this function
     assert len(input_image.shape) == 3, 'Unsupported image format.'
     channel = input_image.shape[2]
     # crop a rectangular region around the center in the image
@@ -680,3 +678,12 @@ def appro_cr(coordinates):
     BC = coordinates[2] - coordinates[1]
     AD = coordinates[3] - coordinates[0]
     return (AC.dot(AC) * BD.dot(BD)) / (BC.dot(BC) * AD.dot(AD))
+
+def to_npy(tensor):
+    """
+    Convert PyTorch tensor to numpy array.
+    """
+    if isinstance(tensor, np.ndarray):
+        return tensor
+    else:
+        return tensor.data.cpu().numpy()

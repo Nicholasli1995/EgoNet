@@ -11,8 +11,6 @@ import libs.arguments.parse as parse
 import libs.logger.logger as liblogger
 import libs.dataset as dataset
 import libs.dataset.KITTI.car_instance
-import libs.model as models
-import libs.model.FCmodel as FCmodel
 import libs.dataset.normalization.operations as nop
 import libs.visualization.points as vp
 import libs.common.transformation as ltr
@@ -21,6 +19,7 @@ from libs.common.img_proc import resize_bbox, get_affine_transform, get_max_pred
 from libs.common.img_proc import affine_transform_modified, cs2bbox, simple_crop, enlarge_bbox
 from libs.trainer.trainer import visualize_lifting_results, get_loader
 from libs.dataset.KITTI.car_instance import interp_dict
+from libs.model.egonet import EgoNet
 
 import shutil
 import torch
@@ -30,185 +29,6 @@ import matplotlib.pyplot as plt
 import os
 import math
 from scipy.spatial.transform import Rotation
-from copy import deepcopy
-
-def prepare_models(cfgs, is_cuda=True):
-    """
-    Initialize and load Ego-Net given a configuration file.
-    """
-    hm_model_settings = cfgs['heatmapModel']
-    hm_model_name = hm_model_settings['name']
-    method_str = 'models.heatmapModel.' + hm_model_name + '.get_pose_net'
-    hm_model = eval(method_str)(cfgs, is_train=False)
-    lifter = FCmodel.get_fc_model(stage_id=1, 
-                                  cfgs=cfgs, 
-                                  input_size=cfgs['FCModel']['input_size'],
-                                  output_size=cfgs['FCModel']['output_size']
-                                  )
-    hm_model.load_state_dict(torch.load(cfgs['dirs']['load_hm_model']))
-    stats = np.load(cfgs['dirs']['load_stats'], allow_pickle=True).item()
-    lifter.load_state_dict(torch.load(cfgs['dirs']['load_lifter']))
-    
-    if is_cuda:
-        hm_model = hm_model.cuda()
-        lifter = lifter.cuda()
-    model_dict = {'heatmap_regression':hm_model.eval(),
-                  'lifting':lifter.eval(),
-                  'FC_stats':stats                  
-                  }
-    return model_dict
-
-def modify_bbox(bbox, target_ar, enlarge=1.1):
-    """
-    Enlarge a bounding box so that occluded parts may be enclosed.
-    """
-    lbbox = enlarge_bbox(bbox[0], bbox[1], bbox[2], bbox[3], [enlarge, enlarge])
-    ret = resize_bbox(lbbox[0], lbbox[1], lbbox[2], lbbox[3], target_ar=target_ar)
-    return ret
-
-def crop_single_instance(img, bbox, resolution, pth_trans=None, xy_dict=None):
-    """
-    Crop a single instance given an image and bounding box.
-    """
-    bbox = to_npy(bbox)
-    target_ar = resolution[0] / resolution[1]
-    ret = modify_bbox(bbox, target_ar)
-    c, s = ret['c'], ret['s']
-    r = 0.
-    # xy_dict: parameters for adding xy coordinate maps
-    trans = get_affine_transform(c, s, r, resolution)
-    instance = cv2.warpAffine(img,
-                              trans,
-                              (int(resolution[0]), int(resolution[1])),
-                              flags=cv2.INTER_LINEAR
-                              )
-    #cv2.imwrite('test.jpg', input)
-    #input = torch.from_numpy(input.transpose(2,0,1))
-    if xy_dict is not None and xy_dict['flag']:
-        xymap = generate_xy_map(ret['bbox'], resolution, img.shape[:-1])
-        instance = np.concatenate([instance, xymap.astype(np.float32)], axis=2)        
-    instance = instance if pth_trans is None else pth_trans(instance)
-    return instance
-
-def crop_instances(annot_dict, 
-                   resolution, 
-                   pth_trans=None, 
-                   rgb=True,
-                   xy_dict=None
-                   ):
-    """
-    Crop input instances given an annotation dictionary.
-    """
-    all_instances = []
-    # each record describes one instance
-    all_records = []
-    target_ar = resolution[0] / resolution[1]
-    for idx, path in enumerate(annot_dict['path']):
-        #print(path)
-        data_numpy = cv2.imread(path, 1 | 128)    
-        if data_numpy is None:
-            raise ValueError('Fail to read {}'.format(path))    
-        if rgb:
-            data_numpy = cv2.cvtColor(data_numpy, cv2.COLOR_BGR2RGB) 
-        boxes = annot_dict['boxes'][idx]
-        if 'labels' in annot_dict:
-            labels = annot_dict['labels'][idx]
-        else:
-            labels = -np.ones((len(boxes)), dtype=np.int64)
-        if 'scores' in annot_dict:
-            scores = annot_dict['scores'][idx]
-        else:
-            scores = -np.ones((len(boxes)))
-        if len(boxes) == 0:
-            continue
-        for idx, bbox in enumerate(boxes):
-            # first crop the instance, and then resize to the required aspect ratio
-            instance = crop_single_instance(data_numpy,
-                                            bbox, 
-                                            resolution, 
-                                            pth_trans=pth_trans,
-                                            xy_dict=xy_dict
-                                            )
-            bbox = to_npy(bbox)
-            ret = modify_bbox(bbox, target_ar)
-            c, s = ret['c'], ret['s']
-            r = 0.
-            all_instances.append(torch.unsqueeze(instance, dim=0))
-            all_records.append({
-                'path': path,
-                'center': c,
-                'scale': s,
-                'bbox': bbox,
-                'bbox_resize': ret['bbox'],
-                'rotation': r,
-                'label': labels[idx],
-                'score': scores[idx]
-                }
-                )
-            #break
-    return torch.cat(all_instances, dim=0), all_records
-
-def get_keypoints(instances, 
-                  records, 
-                  model, 
-                  image_size=(256,256), 
-                  arg_max='hard',
-                  is_cuda=True
-                  ):
-    """
-    Foward pass to obtain the screen coordinates.
-    """
-    if is_cuda:
-        instances = instances.cuda()
-    output = model(instances)
-    if type(output) is tuple:
-        pred, max_vals = output[1].data.cpu().numpy(), None  
-        
-    elif arg_max == 'hard':
-        if not isinstance(output, np.ndarray):
-            output = output.data.cpu().numpy()
-        pred, max_vals = get_max_preds(output)
-    else:
-        raise NotImplementedError
-    if type(output) is tuple:
-        pred *= image_size[0]
-    else:
-        pred *= image_size[0]/output.shape[3]
-    centers = [records[i]['center'] for i in range(len(records))]
-    scales = [records[i]['scale'] for i in range(len(records))]
-    rots = [records[i]['rotation'] for i in range(len(records))]    
-    for sample_idx in range(len(pred)):
-        trans_inv = get_affine_transform(centers[sample_idx],
-                                         scales[sample_idx], 
-                                         rots[sample_idx], 
-                                         image_size, 
-                                         inv=1)
-        pred_src_coordinates = affine_transform_modified(pred[sample_idx], 
-                                                             trans_inv) 
-        record = records[sample_idx]
-        # pred_src_coordinates += np.array([[record['bbox'][0], record['bbox'][1]]])
-        records[sample_idx]['kpts'] = pred_src_coordinates
-    # assemble a dictionary where each key corresponds to one image
-    ret = {}
-    for record in records:
-        path = record['path']
-        if path not in ret:
-            ret[path] = {'center':[], 
-                         'scale':[], 
-                         'rotation':[], 
-                         'bbox_resize':[], # resized bounding box
-                         'kpts_2d_pred':[], 
-                         'label':[], 
-                         'score':[]
-                         }
-        ret[path]['kpts_2d_pred'].append(record['kpts'].reshape(1, -1))
-        ret[path]['center'].append(record['center'])
-        ret[path]['scale'].append(record['scale'])
-        ret[path]['bbox_resize'].append(record['bbox_resize'])
-        ret[path]['label'].append(record['label'])
-        ret[path]['score'].append(record['score'])
-        ret[path]['rotation'].append(record['rotation'])
-    return ret
 
 def kpts_to_euler(template, prediction):
     """
@@ -307,77 +127,6 @@ def get_6d_rep(predictions, ax=None, color="black"):
         draw_pose_vecs(ax, pose_vecs, color=color)
     return angles, translation
 
-def format_str_submission(roll, pitch, yaw, x, y, z, score):
-    """
-    Get a prediction string in ApolloScape style.
-    """      
-    tempt_str = "{pitch:.3f} {yaw:.3f} {roll:.3f} {x:.3f} {y:.3f} {z:.3f} {score:.3f}".format(
-            pitch=pitch,
-            yaw=yaw,
-            roll=roll,
-            x=x,
-            y=y,
-            z=z,
-            score=score)
-    return tempt_str
-
-def get_instance_str(dic):
-    """
-    Produce KITTI style prediction string for one instance.
-    """     
-    string = ""
-    string += dic['class'] + " "
-    string += "{:.1f} ".format(dic['truncation'])
-    string += "{:.1f} ".format(dic['occlusion'])
-    string += "{:.6f} ".format(dic['alpha'])
-    string += "{:.6f} {:.6f} {:.6f} {:.6f} ".format(dic['bbox'][0], dic['bbox'][1], dic['bbox'][2], dic['bbox'][3])
-    string += "{:.6f} {:.6f} {:.6f} ".format(dic['dimensions'][1], dic['dimensions'][2], dic['dimensions'][0])
-    string += "{:.6f} {:.6f} {:.6f} ".format(dic['locations'][0], dic['locations'][1], dic['locations'][2])
-    string += "{:.6f} ".format(dic['rot_y'])
-    if 'score' in dic:
-        string += "{:.8f} ".format(dic['score'])
-    else:
-        string += "{:.8f} ".format(1.0)
-    return string
-
-def get_pred_str(record):
-    """
-    Produce KITTI style prediction string for a record dictionary.
-    """      
-    # replace the rotation prediction generated by the previous stage
-    updated_txt = deepcopy(record['raw_txt_format'])
-    for instance_id in range(len(record['euler_angles'])):
-        updated_txt[instance_id]['rot_y'] = record['euler_angles'][instance_id, 1]
-        updated_txt[instance_id]['alpha'] = record['alphas'][instance_id]
-    pred_str = ""
-    angles = record['euler_angles']
-    for instance_id in range(len(angles)):
-        # format a string for submission
-        tempt_str = get_instance_str(updated_txt[instance_id])
-        if instance_id != len(angles) - 1:
-            tempt_str += '\n'
-        pred_str += tempt_str
-    return pred_str
-
-def lift_2d_to_3d(records, model, stats, template, cuda=True):
-    """
-    Foward-pass of the lifter model.
-    """      
-    for path in records.keys():
-        data = np.concatenate(records[path]['kpts_2d_pred'], axis=0)
-        data = nop.normalize_1d(data, stats['mean_in'], stats['std_in'])
-        data = data.astype(np.float32)
-        data = torch.from_numpy(data)
-        if cuda:
-            data = data.cuda()
-        prediction = model(data)  
-        prediction = nop.unnormalize_1d(prediction.data.cpu().numpy(),
-                                        stats['mean_out'], 
-                                        stats['std_out']
-                                        )
-        records[path]['kpts_3d_pred'] = prediction.reshape(len(prediction), -1, 3)
-    return records
-
 def filter_detection(detected, thres=0.7):
     """
     Filter predictions based on a confidence threshold.
@@ -391,180 +140,6 @@ def filter_detection(detected, thres=0.7):
             tempt_dict[key] = detection[key][indices]
         filtered.append(tempt_dict)
     return filtered
-
-def add_orientation_arrow(record):
-    """
-    Generate an arrow for each predicted orientation for visualization.
-    """      
-    pred_kpts = record['kpts_3d_pred']
-    gt_kpts = record['kpts_3d_gt']
-    K = record['K']
-    arrow_2d = np.zeros((len(pred_kpts), 2, 2))
-    for idx in range(len(pred_kpts)):
-        vector_3d = (pred_kpts[idx][1] - pred_kpts[idx][5])
-        arrow_3d = np.concatenate([gt_kpts[idx][0].reshape(3, 1), 
-                                  (gt_kpts[idx][0] + vector_3d).reshape(3, 1)],
-                                  axis=1)
-        projected = K @ arrow_3d
-        arrow_2d[idx][0] = projected[0, :] / projected[2, :]
-        arrow_2d[idx][1] = projected[1, :] / projected[2, :]
-        # fix the arrow length if not fore-shortened
-        vector_2d = arrow_2d[idx][:,1] - arrow_2d[idx][:,0]
-        length = np.linalg.norm(vector_2d)
-        if length > 50:
-            vector_2d = vector_2d/length * 60
-        arrow_2d[idx][:,1] = arrow_2d[idx][:,0] + vector_2d
-    return arrow_2d
-
-def process_batch(images, 
-                  hm_regressor, 
-                  lifter, 
-                  stats, 
-                  template,
-                  annot_dict,
-                  pth_trans=None, 
-                  is_cuda=True, 
-                  threshold=None,
-                  xy_dict=None
-                  ):
-    """
-    Process a batch of images.
-    # annot_dict is a Python dictionary storing
-    # keys: 
-    #       path: list of image paths
-    #       boxes: list of bounding boxes for each image
-    """
-    all_instances, all_records = crop_instances(annot_dict, 
-                                                resolution=(256, 256),
-                                                pth_trans=pth_trans,
-                                                xy_dict=xy_dict
-                                                )
-    # all_records stores records for each instance
-    records = get_keypoints(all_instances, all_records, hm_regressor)
-    # records stores records for each image
-    records = lift_2d_to_3d(records, lifter, stats, template)
-    # merge with the annotation dictionary
-    for idx, path in enumerate(annot_dict['path']):
-        if 'boxes' in annot_dict:
-            records[path]['boxes'] = to_npy(annot_dict['boxes'][idx])
-        if 'kpts' in annot_dict:
-            records[path]['kpts_2d_gt'] = to_npy(annot_dict['kpts'][idx])   
-        if 'kpts_3d_gt' in annot_dict:
-            records[path]['kpts_3d_gt'] = to_npy(annot_dict['kpts_3d_gt'][idx])   
-        if 'pose_vecs_gt' in annot_dict:            
-            records[path]['pose_vecs_gt'] = to_npy(annot_dict['pose_vecs_gt'][idx])  
-        if 'kpts_3d_SMOKE' in annot_dict:
-            records[path]['kpts_3d_SMOKE'] = to_npy(annot_dict['kpts_3d_SMOKE'][idx])  
-        if 'raw_txt_format' in annot_dict:
-            # list of annotation dictionary for each instance
-            records[path]['raw_txt_format'] = annot_dict['raw_txt_format'][idx]
-        if 'K' in annot_dict:
-            # list of annotation dictionary for each instance
-            records[path]['K'] = annot_dict['K'][idx]
-        if 'kpts_3d_gt' in annot_dict and 'K' in annot_dict:
-            records[path]['arrow'] = add_orientation_arrow(records[path])
-    return records
-
-def to_npy(tensor):
-    """
-    Convert PyTorch tensor to numpy array.
-    """
-    if isinstance(tensor, np.ndarray):
-        return tensor
-    else:
-        return tensor.data.cpu().numpy()
-
-def refine_with_perfect_size(pred, 
-                             observation, 
-                             intrinsics, 
-                             dist_coeffs, 
-                             gts, 
-                             threshold=5., 
-                             ax=None
-                             ):
-    """
-    Use the gt 3D box size for refinement to show the performance gain with 
-    size regression.
-    If there is a nearby ground truth bbox, use its size.
-    pred [9, 3] gts[N, 9, 3]
-    """    
-    pred_center = pred[0, :].reshape(1,3)
-    distance = np.sqrt(np.sum((gts[:, 0, :] - pred_center)**2, axis=1))
-    minimum_idx = np.where(distance == distance.min())[0][0]
-    if distance[minimum_idx] > threshold:
-        return False, None
-    else:
-        # First align the box with gt size with the predicted box, then refine
-        tempt_box_pred = pred.copy()
-        tempt_box_pred[1:, :] += tempt_box_pred[0, :].reshape(1, 3)        
-        tempt_box_gt = gts[minimum_idx].copy()
-        tempt_box_gt[1:, :] += tempt_box_gt[0, :].reshape(1, 3)         
-        pseudo_box = ltr.procrustes_transform(tempt_box_gt.T, tempt_box_pred.T)
-        refined_prediction = ltr.pnp_refine(pseudo_box.T, observation, intrinsics, 
-                                        dist_coeffs) 
-        if ax is not None:
-            vp.plot_lines(ax, 
-                          pseudo_box[:, 1:].T, 
-                          vp.plot_3d_bbox.connections, 
-                          dimension=3, 
-                          c='y',
-                          linestyle='-.')         
-            vp.plot_lines(ax, 
-                          refined_prediction[:, 1:].T, 
-                          vp.plot_3d_bbox.connections, 
-                          dimension=3, 
-                          c='b',
-                          linestyle='-.')         
-        return True, refined_prediction
-
-def refine_with_predicted_bbox(pred, 
-                               observation, 
-                               intrinsics, 
-                               dist_coeffs, 
-                               gts=None, 
-                               threshold=5., 
-                               ax=None
-                               ):
-    """
-    Refine with predicted 3D cuboid (disabled by default).
-    """ 
-    tempt_box_pred = pred.copy()
-    tempt_box_pred[1:, :] += tempt_box_pred[0, :].reshape(1, 3)
-    # use the predicted 3D bounding box size for refinement
-    refined_prediction = ltr.pnp_refine(tempt_box_pred, observation, intrinsics, 
-                                    dist_coeffs)    
-    # discard the results if the refined solution is to far away from the initial position
-    distance = refined_prediction[:, 0] - tempt_box_pred[0, :]
-    distance = np.sqrt(np.sum(distance**2))
-    if distance > threshold:
-        return False, None
-    else:
-        # plotting
-        if ax is not None:
-            vp.plot_lines(ax, 
-                          refined_prediction[:, 1:].T, 
-                          vp.plot_3d_bbox.connections, 
-                          dimension=3, 
-                          c='g')        
-        return True, refined_prediction
-
-def draw_pose_vecs(ax, pose_vecs=None, color='black'):
-    """
-    Add pose vectors to a 3D matplotlib axe.
-    """     
-    if pose_vecs is None:
-        return
-    for pose_vec in pose_vecs:
-        x, y, z, pitch, yaw, roll = pose_vec
-        string = "({:.2f}, {:.2f}, {:.2f})".format(pitch, yaw, roll)
-        # add some random noise to the text location so that they do not overlap
-        nl = 0.02 # noise level
-        ax.text(x*(1+np.random.randn()*nl), 
-                y*(1+np.random.randn()*nl), 
-                z*(1+np.random.randn()*nl), 
-                string, 
-                color=color
-                )
 
 def refine_solution(est_3d, 
                     est_2d, 
@@ -917,16 +492,12 @@ def gather_dict(request, references, filter_c=True):
     return ret
     
 @torch.no_grad()
-def inference(testset, model_settings, results, cfgs):
+def inference(testset, model, results, cfgs):
     """
     The main inference function.
     """
     # visualize to plot the 2D detection and 3D scene reconstruction
     data_loader = get_loader(testset, cfgs, 'testing', collate_fn=my_collate_fn)          
-    hm_regressor = model_settings['heatmap_regression']
-    lifter = model_settings['lifting']
-    # statistics for the FC model
-    stats = model_settings['FC_stats']
     #template = testset.instance_stats['ref_box3d']
     template = None
     pth_trans = testset.pth_trans
@@ -945,11 +516,8 @@ def inference(testset, model_settings, results, cfgs):
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)            
             # ground truth bounding box for comparison
-            record = process_batch(images,
-                                   hm_regressor, 
-                                   lifter, 
-                                   stats, 
-                                   template,
+            record = model(images, 
+                           model,
                                    annot_dict=meta,
                                    pth_trans=pth_trans, 
                                    threshold=None,
@@ -1070,10 +638,10 @@ def main():
     results['flags']['gt'] = cfgs['use_gt_box']
     
     # Initialize Ego-Net and load the pre-trained checkpoint
-    model_dict = prepare_models(cfgs)
+    model = EgoNet(cfgs)
     
     # inference and update prediction
-    inference(dataset_inf, model_dict, results, cfgs)       
+    inference(dataset_inf, model, results, cfgs)       
     
     # then you can run kitti-eval for evaluation
     evaluator = cfgs['dirs']['kitti_evaluator']

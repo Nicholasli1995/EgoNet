@@ -268,6 +268,24 @@ def get_interpolated_points(points, indices, num_interp):
         new_points.append(interpolate(points[start_idx], points[end_idx], num_interp))
     return np.vstack(new_points)
 
+def draw_pose_vecs(ax, pose_vecs=None, color='black'):
+    """
+    Add pose vectors to a 3D matplotlib axe.
+    """     
+    if pose_vecs is None:
+        return
+    for pose_vec in pose_vecs:
+        x, y, z, pitch, yaw, roll = pose_vec
+        string = "({:.2f}, {:.2f}, {:.2f})".format(pitch, yaw, roll)
+        # add some random noise to the text location so that they do not overlap
+        nl = 0.02 # noise level
+        ax.text(x*(1+np.random.randn()*nl), 
+                y*(1+np.random.randn()*nl), 
+                z*(1+np.random.randn()*nl), 
+                string, 
+                color=color
+                )
+        
 def get_bbox_3d(points, add_center=False, interp_style=""):
     # get a 3D bounding boxes from coordinate limits in object coordinate system
     assert len(points.shape) == 2 
