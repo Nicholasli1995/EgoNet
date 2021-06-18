@@ -773,7 +773,7 @@ def refine_one_image(img_path,
             plt.gca().xaxis.set_major_locator(plt.NullLocator())
             plt.gca().yaxis.set_major_locator(plt.NullLocator())
             img_name = img_path.split('/')[-1]
-            save_dir = '/media/nicholas/Database/datasets/KITTI/qualitative_results/'
+            save_dir = './debug/qualitative_results/'
             plt.savefig(save_dir + img_name, dpi=100, bbox_inches = 'tight', pad_inches = 0)
     # plot 3d bounding boxes
     all_kpts_2d = np.concatenate(record['kpts_2d_pred'])

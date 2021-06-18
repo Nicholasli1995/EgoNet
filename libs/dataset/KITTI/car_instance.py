@@ -116,6 +116,8 @@ def get_cr_indices():
 class KITTI(bc.SupervisedDataset):
     def __init__(self, cfgs, split, logger, scale=1.0, use_stereo=False):
         super().__init__(cfgs, split, logger)
+        self.logger = logger
+        self.logger.info("Initializing KITTI {:s} set, Please wait...".format(split))
         self.exp_type = cfgs['exp_type'] # exp_type: experiment type 
         self._data_dir = cfgs['dataset']['root'] # root directory
         self._classes = cfgs['dataset']['detect_classes'] # used object classes
@@ -146,8 +148,9 @@ class KITTI(bc.SupervisedDataset):
             self.use_ss = True
             self.ss_settings = cfgs['ss']
             self._initialize_unlabeled_data(cfgs)
+        self.logger.info("Initialization finished for KITTI {:s} set".format(split))
         # self.show_statistics()
-        # debug
+        # debugging code if you need
         # test = self[10]
         # test = self.extract_ss_sample(1)
     
@@ -435,11 +438,13 @@ class KITTI(bc.SupervisedDataset):
         """
         Read the prediction files in the same format as the ground truth.
         """
+        self.logger.info("Reading predictions from {:s}".format(path))
         file_list = listdir(path)  
         record_dict = {}
         use_raw_bbox = True if self.split == 'test' else False
         for file_name in file_list:
-            assert file_name.endswith(".txt")
+            if not file_name.endswith(".txt"):
+                continue
             image_name = file_name[:-4] + ".png"
             label_path = pjoin(path, file_name)            
             self.read_single_file(image_name, 
@@ -447,7 +452,7 @@ class KITTI(bc.SupervisedDataset):
                                   label_path=label_path,
                                   use_raw_bbox=use_raw_bbox
                                   )
-        
+        self.logger.info("Reading predictions finished.")
         return record_dict
     
     def _get_data_parameters(self, cfgs):

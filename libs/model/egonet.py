@@ -8,14 +8,17 @@ Contact: nicholas.li@connect.ust.hk
 import torch
 import torch.nn as nn
 import numpy as np
+import matplotlib.pyplot as plt
 import cv2
 
 import libs.model as models
 import libs.model.FCmodel as FCmodel
 import libs.dataset.normalization.operations as nop
+import libs.visualization.points as vp
 
 from libs.common.img_proc import to_npy, resize_bbox, get_affine_transform, get_max_preds, generate_xy_map
 from libs.common.img_proc import affine_transform_modified, cs2bbox, simple_crop, enlarge_bbox
+from libs.common.format import save_txt_file
 
 class EgoNet(nn.Module):
     def __init__(self,
@@ -34,6 +37,7 @@ class EgoNet(nn.Module):
         # backbones as well
         method_str = 'models.heatmapModel.' + hm_model_name + '.get_pose_net'
         self.HC = eval(method_str)(cfgs, is_train=False)
+        self.resolution = cfgs['heatmapModel']['input_size']
         # initialize a lifing model
         # this corresponds to L in Equation (2) 
         self.L = FCmodel.get_fc_model(stage_id=1, 
@@ -48,14 +52,6 @@ class EgoNet(nn.Module):
             self.LS = np.load(cfgs['dirs']['load_stats'], allow_pickle=True).item()
             self.L.load_state_dict(torch.load(cfgs['dirs']['load_lifter']))
     
-    def modify_bbox(self, bbox, target_ar, enlarge=1.1):
-        """
-        Enlarge a bounding box so that occluded parts may be included.
-        """
-        lbbox = enlarge_bbox(bbox[0], bbox[1], bbox[2], bbox[3], [enlarge, enlarge])
-        ret = resize_bbox(lbbox[0], lbbox[1], lbbox[2], lbbox[3], target_ar=target_ar)
-        return ret
-
     def crop_single_instance(self, 
                              img, 
                              bbox, 
@@ -187,6 +183,247 @@ class EgoNet(nn.Module):
                 records[path]['arrow'] = self.add_orientation_arrow(records[path])
         return records
 
+    def gather_lifting_results(self,
+                               record,
+                               data,
+                               prediction, 
+                               target=None,
+                               pose_vecs=None,
+                               intrinsics=None, 
+                               refine=False, 
+                               visualize=False,
+                               template=None,
+                               dist_coeffs=np.zeros((4,1)),
+                               color='r',
+                               get_str=False,
+                               alpha_mode='trans'
+                               ):
+        """
+        Lift Screen coordinates to 3D representation and a optimization-based 
+        refinement is optional.
+        """
+        if target is not None:
+            p3d_gt = target.reshape(len(target), -1, 3)
+        else:
+            p3d_gt = None
+        p3d_pred = prediction.reshape(len(prediction), -1, 3)
+        # only for visualizing the prediciton of shape using gt bboxes
+        if "kpts_3d_SMOKE" in record:
+            p3d_pred = np.concatenate([record['kpts_3d_SMOKE'][:, [0], :], p3d_pred], axis=1)
+        elif p3d_gt is not None and p3d_gt.shape[1] == p3d_pred.shape[1] + 1:
+            if len(p3d_pred) != len(p3d_gt):
+                print('debug')
+            assert len(p3d_pred) == len(p3d_gt)
+            p3d_pred = np.concatenate([p3d_gt[:, [0], :], p3d_pred], axis=1) 
+        else:
+            raise NotImplementedError
+        # this object will be updated if one prediction is refined 
+        p3d_pred_refined = p3d_pred.copy()
+        refine_flags = [False for i in range(len(p3d_pred_refined))]
+        # similar object but using a different refinement strategy
+        p3d_pred_refined2 = p3d_pred.copy()
+        refine_flags2 = [False for i in range(len(p3d_pred_refined2))]
+        # input 2D keypoints
+        data = data.reshape(len(data), -1, 2)
+        if visualize:
+            if 'plots' in record and 'ax3d' in record['plots']:
+                ax = record['plots']['ax3d']
+                ax = vp.plot_scene_3dbox(p3d_pred, p3d_gt, ax=ax, color=color)
+            elif 'plots' in record:
+            # plotting the 3D scene
+                ax = vp.plot_scene_3dbox(p3d_pred, p3d_gt, color=color)
+                vp.draw_pose_vecs(ax, pose_vecs)
+                record['plots']['ax3d'] = ax
+            else:
+                raise ValueError
+        else:
+            ax = None
+        if refine:
+            assert intrinsics is not None         
+            # refine 3D point prediction by minimizing re-projection errors        
+            refine_solution(p3d_pred, 
+                            data, 
+                            intrinsics, 
+                            dist_coeffs, 
+                            refine_with_predicted_bbox, 
+                            p3d_pred_refined, 
+                            refine_flags,
+                            ax=ax
+                            )
+            if target is not None:
+                # refine with ground truth bounding box size for debugging purpose
+                refine_solution(p3d_pred, 
+                                data, 
+                                intrinsics, 
+                                dist_coeffs, 
+                                refine_with_perfect_size, 
+                                p3d_pred_refined2, 
+                                refine_flags2,
+                                gts=p3d_gt,
+                                ax=ax
+                                )        
+        record['kpts_3d_refined'] = p3d_pred_refined  
+        # prepare the prediction string for submission
+        # compute the roll, pitch and yaw angle of the predicted bounding box
+        record['euler_angles'], record['translation'] = \
+            get_6d_rep(record['kpts_3d_refined'], ax, color=color) # the predicted pose vectors are also drawn here
+        if alpha_mode == 'trans':
+            record['alphas'] = get_observation_angle_trans(record['euler_angles'], 
+                                                           record['translation'])
+        elif alpha_mode == 'proj':
+            record['alphas'] = get_observation_angle_proj(record['euler_angles'],
+                                                          record['kpts_2d_pred'],
+                                                          record['K'])        
+        else:
+             raise NotImplementedError   
+        if get_str:
+            record['pred_str'] = get_pred_str(record)      
+        return record
+
+    def plot_one_image(self,
+                         img_path, 
+                         record, 
+                         add_3d_bbox=True, 
+                         camera=None, 
+                         template=None,
+                         visualize=False,
+                         color_dict={'bbox_2d':'r',
+                                     'bbox_3d':'r',
+                                     'kpts':['rx', 'b']
+                                     },
+                         save_dict={'flag':False,
+                                    'save_dir':None
+                                    },
+                         alpha_mode='trans'
+                         ):
+        """
+        Refine the predictions from a single image.
+        """
+        # plot 2D predictions 
+        if visualize:
+            if 'plots' in record:
+                fig = record['plots']['fig2d']
+                ax = record['plots']['ax2d']
+            else:
+                fig = plt.figure(figsize=(11.3, 9))
+                ax = plt.subplot(111)
+                record['plots'] = {}
+                record['plots']['fig2d'] = fig
+                record['plots']['ax2d'] = ax
+                image = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)[:, :, ::-1]
+                height, width, _ = image.shape
+                ax.imshow(image) 
+                ax.set_xlim([0, width])
+                ax.set_ylim([0, height])
+                ax.invert_yaxis()
+                
+            num_instances = len(record['kpts_2d_pred'])
+            for idx in range(num_instances):
+                kpts = record['kpts_2d_pred'][idx].reshape(-1, 2)
+                # kpts_3d = record['kpts_3d'][idx]
+                bbox = record['bbox_resize'][idx]
+                label = record['label'][idx]
+                score = record['score'][idx]
+                vp.plot_2d_bbox(ax, bbox, color_dict['bbox_2d'], score, label)
+                # predicted key-points
+                ax.plot(kpts[:, 0], kpts[:, 1], color_dict['kpts'][0])
+                # if add_3d_bbox:
+                #     vp.plot_3d_bbox(ax, kpts[1:,], color_dict['kpts'][1])  
+                # bbox_3d_projected = project_3d_to_2d(kpts_3d)
+                # vp.plot_3d_bbox(ax, bbox_3d_projected[:2, :].T)      
+            # plot ground truth
+            if 'kpts_2d_gt' in record:
+                for idx, kpts_gt in enumerate(record['kpts_2d_gt']):
+                    kpts_gt = kpts_gt.reshape(-1, 3)
+                    # ax.plot(kpts_gt[:, 0], kpts_gt[:, 1], 'gx')
+                    vp.plot_3d_bbox(ax, kpts_gt[1:, :2], color='g', linestyle='-.')
+            if 'arrow' in record:
+                for idx in range(len(record['arrow'])):
+                    start = record['arrow'][idx][:,0]
+                    end = record['arrow'][idx][:,1]
+                    x, y = start
+                    dx, dy = end - start
+                    ax.arrow(x, y, dx, dy, color='r', lw=4, head_width=5, alpha=0.5)         
+                # save intermediate results
+                plt.gca().set_axis_off()
+                plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, 
+                hspace = 0, wspace = 0)
+                plt.margins(0,0)
+                plt.gca().xaxis.set_major_locator(plt.NullLocator())
+                plt.gca().yaxis.set_major_locator(plt.NullLocator())
+                img_name = img_path.split('/')[-1]
+                save_dir = './qualitative_results/'
+                plt.savefig(save_dir + img_name, dpi=100, bbox_inches = 'tight', pad_inches = 0)
+        # plot 3d bounding boxes
+        all_kpts_2d = np.concatenate(record['kpts_2d_pred'])
+        all_kpts_3d_pred = record['kpts_3d_pred'].reshape(len(record['kpts_3d_pred']), -1)
+        if 'kpts_3d_gt' in record:
+            all_kpts_3d_gt = record['kpts_3d_gt']
+            all_pose_vecs_gt = record['pose_vecs_gt']
+        else:
+            all_kpts_3d_gt = None
+            all_pose_vecs_gt = None
+        refine_args = {'visualize':visualize, 'get_str':save_dict['flag']}
+        if camera is not None:
+            refine_args['intrinsics'] = camera
+            refine_args['refine'] = True
+            refine_args['template'] = template
+        # refine and gather the prediction strings
+        record = self.gather_lifting_results(record,
+                                        all_kpts_2d,
+                                        all_kpts_3d_pred, 
+                                        all_kpts_3d_gt,
+                                        all_pose_vecs_gt,
+                                        color=color_dict['bbox_3d'],
+                                        alpha_mode=alpha_mode,
+                                        **refine_args
+                                        )
+        # plot 3D bounding box generated by SMOKE
+        if 'kpts_3d_SMOKE' in record:
+            kpts_3d_SMOKE = record['kpts_3d_SMOKE']
+            if 'plots' in record:
+                # update drawings
+                ax = record['plots']['ax3d']
+                vp.plot_scene_3dbox(kpts_3d_SMOKE, ax=ax, color='m')    
+                pose_vecs = np.zeros((len(kpts_3d_SMOKE), 6))
+                for idx in range(len(pose_vecs)):
+                    pose_vecs[idx][0:3] = record['raw_txt_format'][idx]['locations']
+                    pose_vecs[idx][4] = record['raw_txt_format'][idx]['rot_y']
+                # plot pose vectors
+                vp.draw_pose_vecs(ax, pose_vecs, color='m')
+        # save KITTI-style prediction file in .txt format
+        save_txt_file(img_path, record, save_dict)
+        return record
+
+    def post_process(self, 
+                     records, 
+                     camera=None, 
+                     template=None, 
+                     visualize=False, 
+                     color_dict={'bbox_2d':'r',
+                                 'kpts':['ro', 'b'],
+                                 },
+                     save_dict={'flag':False,
+                                'save_dir':None
+                                },
+                     alpha_mode='trans'
+                     ):
+        """
+        Save save and visualize them optionally.
+        """   
+        for img_path in records.keys():
+            print(img_path)
+            records[img_path] = self.plot_one_image(img_path, 
+                                                      records[img_path], 
+                                                      camera=camera,
+                                                      template=template,
+                                                      visualize=visualize,
+                                                      color_dict=color_dict,
+                                                      save_dict=save_dict,
+                                                      alpha_mode=alpha_mode
+                                                      )      
+        return records
+
     def get_keypoints(self,
                       instances, 
                       records,
@@ -268,15 +505,7 @@ class EgoNet(nn.Module):
             records[path]['kpts_3d_pred'] = prediction.reshape(len(prediction), -1, 3)
         return records
     
-    def forward(self, 
-                images, 
-                template,
-                annot_dict,
-                pth_trans=None, 
-                is_cuda=True, 
-                threshold=None,
-                xy_dict=None
-                ):
+    def forward(self, annot_dict):
         """
         Process a batch of images.
         
@@ -285,9 +514,9 @@ class EgoNet(nn.Module):
             boxes: list of bounding boxes for each image
         """
         all_instances, all_records = self.crop_instances(annot_dict, 
-                                                         resolution=(256, 256),
-                                                         pth_trans=pth_trans,
-                                                         xy_dict=xy_dict
+                                                         resolution=self.resolution,
+                                                         pth_trans=self.pth_trans,
+                                                         xy_dict=self.xy_dict
                                                          )
         # all_records stores records for each instance
         records = self.get_keypoints(all_instances, all_records)

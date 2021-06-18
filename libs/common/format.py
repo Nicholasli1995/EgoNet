@@ -1,6 +1,7 @@
 """
 Methods for formatted output.
 """
+import os
 
 from copy import deepcopy
 
@@ -55,3 +56,15 @@ def get_pred_str(record):
             tempt_str += '\n'
         pred_str += tempt_str
     return pred_str
+
+def save_txt_file(img_path, prediction, params):
+    """
+    Save a txt file for predictions of an image.
+    """    
+    if not params['flag']:
+        return
+    file_name = img_path.split('/')[-1][:-3] + 'txt'
+    save_path = os.path.join(params['save_dir'], file_name) 
+    with open(save_path, 'w') as f:
+        f.write(prediction['pred_str'])
+    return

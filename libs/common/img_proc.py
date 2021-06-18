@@ -419,6 +419,14 @@ def enlarge_bbox(left, top, right, bottom, enlarge):
     new_bottom = center_y + 0.5*new_height
     return [new_left, new_top, new_right, new_bottom]
 
+def modify_bbox(bbox, target_ar, enlarge=1.1):
+    """
+    Enlarge a bounding box so that occluded parts may be included.
+    """
+    lbbox = enlarge_bbox(bbox[0], bbox[1], bbox[2], bbox[3], [enlarge, enlarge])
+    ret = resize_bbox(lbbox[0], lbbox[1], lbbox[2], lbbox[3], target_ar=target_ar)
+    return ret
+    
 def resize_crop(crop_size, target_ar=None):
     if target_ar is None:
         return crop_size
