@@ -10,15 +10,20 @@ import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+import math
+
+from scipy.spatial.transform import Rotation
 
 import libs.model as models
 import libs.model.FCmodel as FCmodel
 import libs.dataset.normalization.operations as nop
 import libs.visualization.points as vp
+import libs.common.transformation as ltr
 
-from libs.common.img_proc import to_npy, resize_bbox, get_affine_transform, get_max_preds, generate_xy_map, modify_bbox
-from libs.common.img_proc import affine_transform_modified, cs2bbox, simple_crop, enlarge_bbox
-from libs.common.format import save_txt_file
+from libs.common.img_proc import to_npy, get_affine_transform, generate_xy_map, modify_bbox
+from libs.common.img_proc import affine_transform_modified
+from libs.common.format import save_txt_file, get_pred_str
+from libs.dataset.KITTI.car_instance import interp_dict
 
 class EgoNet(nn.Module):
     def __init__(self,
@@ -179,8 +184,8 @@ class EgoNet(nn.Module):
                 records[path]['kpts_3d_gt'] = to_npy(annot_dict['kpts_3d_gt'][idx])   
             if 'pose_vecs_gt' in annot_dict:            
                 records[path]['pose_vecs_gt'] = to_npy(annot_dict['pose_vecs_gt'][idx])  
-            if 'kpts_3d_SMOKE' in annot_dict:
-                records[path]['kpts_3d_SMOKE'] = to_npy(annot_dict['kpts_3d_SMOKE'][idx])  
+            if 'kpts_3d_before' in annot_dict:
+                records[path]['kpts_3d_before'] = to_npy(annot_dict['kpts_3d_before'][idx])  
             if 'raw_txt_format' in annot_dict:
                 # list of annotation dictionary for each instance
                 records[path]['raw_txt_format'] = annot_dict['raw_txt_format'][idx]
@@ -190,6 +195,103 @@ class EgoNet(nn.Module):
             if 'kpts_3d_gt' in annot_dict and 'K' in annot_dict:
                 records[path]['arrow'] = self.add_orientation_arrow(records[path])
         return records
+
+    def get_observation_angle_trans(self, euler_angles, translations):
+        """
+        Convert orientation in camera coordinate into local coordinate system
+        utilizing known object location (translation)
+        """ 
+        alphas = euler_angles[:,1].copy()
+        for idx in range(len(euler_angles)):
+            ry3d = euler_angles[idx][1] # orientation in the camera coordinate system
+            x3d, z3d = translations[idx][0], translations[idx][2]
+            alpha = ry3d - math.atan2(-z3d, x3d) - 0.5 * math.pi
+            #alpha = ry3d - math.atan2(x3d, z3d)# - 0.5 * math.pi
+            while alpha > math.pi: alpha -= math.pi * 2
+            while alpha < (-math.pi): alpha += math.pi * 2
+            alphas[idx] = alpha
+        return alphas
+    
+    def get_observation_angle_proj(self, euler_angles, kpts, K):
+        """
+        Convert orientation in camera coordinate into local coordinate system
+        utilizing the projection of object on the image plane
+        """ 
+        f = K[0,0]
+        cx = K[0,2]
+        kpts_x = [kpts[i][0,0] for i in range(len(kpts))]
+        alphas = euler_angles[:,1].copy()
+        for idx in range(len(euler_angles)):
+            ry3d = euler_angles[idx][1] # orientation in the camera coordinate system
+            x3d, z3d = kpts_x[idx] - cx, f
+            alpha = ry3d - math.atan2(-z3d, x3d) - 0.5 * math.pi
+            #alpha = ry3d - math.atan2(x3d, z3d)# - 0.5 * math.pi
+            while alpha > math.pi: alpha -= math.pi * 2
+            while alpha < (-math.pi): alpha += math.pi * 2
+            alphas[idx] = alpha
+        return alphas
+
+    def get_template(self, prediction, interp_coef=[0.332, 0.667]):
+        """
+        Construct a template 3D cuboid used for computing regid transformation.
+        """ 
+        parents = prediction[interp_dict['bbox12'][0]]
+        children = prediction[interp_dict['bbox12'][1]]
+        lines = parents - children
+        lines = np.sqrt(np.sum(lines**2, axis=1))
+        h = np.sum(lines[:4])/4 # averaged over the four parallel line segments
+        l = np.sum(lines[4:8])/4
+        w = np.sum(lines[8:])/4
+        x_corners = [0.5*l, l, l, l, l, 0, 0, 0, 0]
+        y_corners = [0.5*h, 0, h, 0, h, 0, h, 0, h]
+        z_corners = [0.5*w, w, w, 0, 0, w, w, 0, 0]
+        x_corners += - np.float32(l) / 2
+        y_corners += - np.float32(h)
+        #y_corners += - np.float32(h/2)
+        z_corners += - np.float32(w) / 2
+        corners_3d = np.array([x_corners, y_corners, z_corners])    
+        if len(prediction) == 33:
+            pidx, cidx = interp_dict['bbox12']
+            parents, children = corners_3d[:, pidx], corners_3d[:, cidx]
+            lines = children - parents
+            new_joints = [(parents + interp_coef[i]*lines) for i in range(len(interp_coef))]
+            corners_3d = np.hstack([corners_3d, np.hstack(new_joints)])    
+        return corners_3d
+
+    def kpts_to_euler(self, template, prediction):
+        """
+        Convert the predicted cuboid representation to euler angles.
+        """    
+        # estimate roll, pitch, yaw of the prediction by comparing with a 
+        # reference bounding box
+        # prediction and template of shape [3, N_points]
+        R, T = ltr.compute_rigid_transform(template, prediction)
+        # in the order of yaw, pitch and roll
+        angles = Rotation.from_matrix(R).as_euler('yxz', degrees=False)
+        # re-order in the order of x, y and z
+        angles = angles[[1,0,2]]
+        return angles, T
+
+    def get_6d_rep(self, predictions, ax=None, color="black"):
+        """
+        Get the 6DoF representation of a 3D prediction.
+        """    
+        predictions = predictions.reshape(len(predictions), -1, 3)
+        all_angles = []
+        for instance_idx in range(len(predictions)):
+            prediction = predictions[instance_idx]
+            # templates are 3D boxes with no rotation
+            # the prediction is estimated as the rotation between prediction and template
+            template = self.get_template(prediction)
+            instance_angle, instance_trans = self.kpts_to_euler(template, prediction.T)        
+            all_angles.append(instance_angle.reshape(1, 3))
+        angles = np.concatenate(all_angles)
+        # the first point is the predicted point center
+        translation = predictions[:, 0, :]    
+        if ax is not None:
+            pose_vecs = np.concatenate([translation, angles], axis=1)
+            vp.draw_pose_vecs(ax, pose_vecs, color=color)
+        return angles, translation
 
     def gather_lifting_results(self,
                                record,
@@ -207,8 +309,7 @@ class EgoNet(nn.Module):
                                alpha_mode='trans'
                                ):
         """
-        Lift Screen coordinates to 3D representation and a optimization-based 
-        refinement is optional.
+        Convert network outputs to pose angles.
         """
         if target is not None:
             p3d_gt = target.reshape(len(target), -1, 3)
@@ -216,8 +317,8 @@ class EgoNet(nn.Module):
             p3d_gt = None
         p3d_pred = prediction.reshape(len(prediction), -1, 3)
         # only for visualizing the prediciton of shape using gt bboxes
-        if "kpts_3d_SMOKE" in record:
-            p3d_pred = np.concatenate([record['kpts_3d_SMOKE'][:, [0], :], p3d_pred], axis=1)
+        if "kpts_3d_before" in record:
+            p3d_pred = np.concatenate([record['kpts_3d_before'][:, [0], :], p3d_pred], axis=1)
         elif p3d_gt is not None and p3d_gt.shape[1] == p3d_pred.shape[1] + 1:
             if len(p3d_pred) != len(p3d_gt):
                 print('debug')
@@ -245,41 +346,17 @@ class EgoNet(nn.Module):
             else:
                 raise ValueError
         else:
-            ax = None
-        if refine:
-            assert intrinsics is not None         
-            # refine 3D point prediction by minimizing re-projection errors        
-            refine_solution(p3d_pred, 
-                            data, 
-                            intrinsics, 
-                            dist_coeffs, 
-                            refine_with_predicted_bbox, 
-                            p3d_pred_refined, 
-                            refine_flags,
-                            ax=ax
-                            )
-            if target is not None:
-                # refine with ground truth bounding box size for debugging purpose
-                refine_solution(p3d_pred, 
-                                data, 
-                                intrinsics, 
-                                dist_coeffs, 
-                                refine_with_perfect_size, 
-                                p3d_pred_refined2, 
-                                refine_flags2,
-                                gts=p3d_gt,
-                                ax=ax
-                                )        
+            ax = None       
         record['kpts_3d_refined'] = p3d_pred_refined  
         # prepare the prediction string for submission
         # compute the roll, pitch and yaw angle of the predicted bounding box
         record['euler_angles'], record['translation'] = \
-            get_6d_rep(record['kpts_3d_refined'], ax, color=color) # the predicted pose vectors are also drawn here
+            self.get_6d_rep(record['kpts_3d_refined'], ax, color=color) # the predicted pose vectors are also drawn here
         if alpha_mode == 'trans':
-            record['alphas'] = get_observation_angle_trans(record['euler_angles'], 
+            record['alphas'] = self.get_observation_angle_trans(record['euler_angles'], 
                                                            record['translation'])
         elif alpha_mode == 'proj':
-            record['alphas'] = get_observation_angle_proj(record['euler_angles'],
+            record['alphas'] = self.get_observation_angle_proj(record['euler_angles'],
                                                           record['kpts_2d_pred'],
                                                           record['K'])        
         else:
@@ -288,24 +365,23 @@ class EgoNet(nn.Module):
             record['pred_str'] = get_pred_str(record)      
         return record
 
-    def plot_one_image(self,
-                         img_path, 
-                         record, 
-                         add_3d_bbox=True, 
-                         camera=None, 
-                         template=None,
-                         visualize=False,
-                         color_dict={'bbox_2d':'r',
-                                     'bbox_3d':'r',
-                                     'kpts':['rx', 'b']
-                                     },
-                         save_dict={'flag':False,
-                                    'save_dir':None
-                                    },
-                         alpha_mode='trans'
-                         ):
+    def plot_one_image(self, 
+                       img_path, 
+                       record, 
+                       camera=None, 
+                       template=None,
+                       visualize=False,
+                       color_dict={'bbox_2d':'r',
+                                   'bbox_3d':'r',
+                                   'kpts':['rx', 'b']
+                                   },
+                       save_dict={'flag':False,
+                                  'save_dir':None
+                                  },
+                       alpha_mode='trans'
+                       ):
         """
-        Refine the predictions from a single image.
+        Post-process and plot the predictions from one image.
         """
         # plot 2D predictions 
         if visualize:
@@ -328,22 +404,16 @@ class EgoNet(nn.Module):
             num_instances = len(record['kpts_2d_pred'])
             for idx in range(num_instances):
                 kpts = record['kpts_2d_pred'][idx].reshape(-1, 2)
-                # kpts_3d = record['kpts_3d'][idx]
                 bbox = record['bbox_resize'][idx]
                 label = record['label'][idx]
                 score = record['score'][idx]
                 vp.plot_2d_bbox(ax, bbox, color_dict['bbox_2d'], score, label)
                 # predicted key-points
-                ax.plot(kpts[:, 0], kpts[:, 1], color_dict['kpts'][0])
-                # if add_3d_bbox:
-                #     vp.plot_3d_bbox(ax, kpts[1:,], color_dict['kpts'][1])  
-                # bbox_3d_projected = project_3d_to_2d(kpts_3d)
-                # vp.plot_3d_bbox(ax, bbox_3d_projected[:2, :].T)      
-            # plot ground truth
+                ax.plot(kpts[:, 0], kpts[:, 1], color_dict['kpts'][0])    
+            # plot ground truth if needed
             if 'kpts_2d_gt' in record:
                 for idx, kpts_gt in enumerate(record['kpts_2d_gt']):
                     kpts_gt = kpts_gt.reshape(-1, 3)
-                    # ax.plot(kpts_gt[:, 0], kpts_gt[:, 1], 'gx')
                     vp.plot_3d_bbox(ax, kpts_gt[1:, :2], color='g', linestyle='-.')
             if 'arrow' in record:
                 for idx in range(len(record['arrow'])):
@@ -353,15 +423,15 @@ class EgoNet(nn.Module):
                     dx, dy = end - start
                     ax.arrow(x, y, dx, dy, color='r', lw=4, head_width=5, alpha=0.5)         
                 # save intermediate results
-                plt.gca().set_axis_off()
-                plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, 
-                hspace = 0, wspace = 0)
-                plt.margins(0,0)
-                plt.gca().xaxis.set_major_locator(plt.NullLocator())
-                plt.gca().yaxis.set_major_locator(plt.NullLocator())
-                img_name = img_path.split('/')[-1]
-                save_dir = './qualitative_results/'
-                plt.savefig(save_dir + img_name, dpi=100, bbox_inches = 'tight', pad_inches = 0)
+                # plt.gca().set_axis_off()
+                # plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, 
+                # hspace = 0, wspace = 0)
+                # plt.margins(0,0)
+                # plt.gca().xaxis.set_major_locator(plt.NullLocator())
+                # plt.gca().yaxis.set_major_locator(plt.NullLocator())
+                # img_name = img_path.split('/')[-1]
+                # save_dir = './qualitative_results/'
+                # plt.savefig(save_dir + img_name, dpi=100, bbox_inches = 'tight', pad_inches = 0)
         # plot 3d bounding boxes
         all_kpts_2d = np.concatenate(record['kpts_2d_pred'])
         all_kpts_3d_pred = record['kpts_3d_pred'].reshape(len(record['kpts_3d_pred']), -1)
@@ -371,29 +441,29 @@ class EgoNet(nn.Module):
         else:
             all_kpts_3d_gt = None
             all_pose_vecs_gt = None
-        refine_args = {'visualize':visualize, 'get_str':save_dict['flag']}
+        refine_args = {'visualize':visualize, 
+                       'get_str':save_dict['flag']
+                       }
         if camera is not None:
-            refine_args['intrinsics'] = camera
-            refine_args['refine'] = True
-            refine_args['template'] = template
+            raise ValueError("Deprecated.")
         # refine and gather the prediction strings
         record = self.gather_lifting_results(record,
-                                        all_kpts_2d,
-                                        all_kpts_3d_pred, 
-                                        all_kpts_3d_gt,
-                                        all_pose_vecs_gt,
-                                        color=color_dict['bbox_3d'],
-                                        alpha_mode=alpha_mode,
-                                        **refine_args
-                                        )
-        # plot 3D bounding box generated by SMOKE
-        if 'kpts_3d_SMOKE' in record:
-            kpts_3d_SMOKE = record['kpts_3d_SMOKE']
+                                             all_kpts_2d,
+                                             all_kpts_3d_pred, 
+                                             all_kpts_3d_gt,
+                                             all_pose_vecs_gt,
+                                             color=color_dict['bbox_3d'],
+                                             alpha_mode=alpha_mode,
+                                             **refine_args
+                                            )
+        # plot input 3D bounding boxes before using Ego-Net
+        if 'kpts_3d_before' in record:
+            kpts_3d_before = record['kpts_3d_before']
             if 'plots' in record:
                 # update drawings
                 ax = record['plots']['ax3d']
-                vp.plot_scene_3dbox(kpts_3d_SMOKE, ax=ax, color='m')    
-                pose_vecs = np.zeros((len(kpts_3d_SMOKE), 6))
+                vp.plot_scene_3dbox(kpts_3d_before, ax=ax, color='m')    
+                pose_vecs = np.zeros((len(kpts_3d_before), 6))
                 for idx in range(len(pose_vecs)):
                     pose_vecs[idx][0:3] = record['raw_txt_format'][idx]['locations']
                     pose_vecs[idx][4] = record['raw_txt_format'][idx]['rot_y']
@@ -420,16 +490,16 @@ class EgoNet(nn.Module):
         Save save and visualize them optionally.
         """   
         for img_path in records.keys():
-            print(img_path)
+            print("Processing {:s}".format(img_path))
             records[img_path] = self.plot_one_image(img_path, 
-                                                      records[img_path], 
-                                                      camera=camera,
-                                                      template=template,
-                                                      visualize=visualize,
-                                                      color_dict=color_dict,
-                                                      save_dict=save_dict,
-                                                      alpha_mode=alpha_mode
-                                                      )      
+                                                    records[img_path], 
+                                                    camera=camera,
+                                                    template=template,
+                                                    visualize=visualize,
+                                                    color_dict=color_dict,
+                                                    save_dict=save_dict,
+                                                    alpha_mode=alpha_mode
+                                                    )      
         return records
     
     def new_img_dict(self):
@@ -448,9 +518,7 @@ class EgoNet(nn.Module):
     
     def get_keypoints(self,
                       instances, 
-                      records,
-                      image_size=(256,256), 
-                      arg_max='hard',
+                      records, 
                       is_cuda=True
                       ):
         """

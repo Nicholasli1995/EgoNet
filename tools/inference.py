@@ -4,6 +4,8 @@ Inference of Ego-Net on KITTI dataset.
 The user can provide the 3D bounding boxes predicted by other 3D object detectors
 and run Ego-Net to refine the orientation of these instances.
 
+The user can also visualize the intermediate results.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
@@ -13,123 +15,16 @@ sys.path.append('../')
 
 import libs.arguments.parse as parse
 import libs.logger.logger as liblogger
-import libs.dataset as dataset
-import libs.dataset.KITTI.car_instance
-import libs.dataset.normalization.operations as nop
-import libs.visualization.points as vp
-import libs.common.transformation as ltr
+import libs.dataset.KITTI.car_instance as libkitti
 
-from libs.common.img_proc import resize_bbox, get_affine_transform, get_max_preds, generate_xy_map, modify_bbox
-from libs.common.img_proc import affine_transform_modified, cs2bbox, simple_crop, enlarge_bbox
-from libs.trainer.trainer import visualize_lifting_results, get_loader
-from libs.dataset.KITTI.car_instance import interp_dict
+from libs.common.img_proc import modify_bbox
+from libs.trainer.trainer import get_loader
 from libs.model.egonet import EgoNet
 
 import shutil
 import torch
-import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 import os
-import math
-from scipy.spatial.transform import Rotation
-
-def kpts_to_euler(template, prediction):
-    """
-    Convert the predicted cuboid representation to euler angles.
-    """    
-    # estimate roll, pitch, yaw of the prediction by comparing with a 
-    # reference bounding box
-    # prediction and template of shape [3, N_points]
-    R, T = ltr.compute_rigid_transform(template, prediction)
-    # in the order of yaw, pitch and roll
-    angles = Rotation.from_matrix(R).as_euler('yxz', degrees=False)
-    # re-order in the order of x, y and z
-    angles = angles[[1,0,2]]
-    return angles, T
-
-def get_template(prediction, interp_coef=[0.332, 0.667]):
-    """
-    Construct a template 3D cuboid used for computing regid transformation.
-    """ 
-    parents = prediction[interp_dict['bbox12'][0]]
-    children = prediction[interp_dict['bbox12'][1]]
-    lines = parents - children
-    lines = np.sqrt(np.sum(lines**2, axis=1))
-    h = np.sum(lines[:4])/4 # averaged over the four parallel line segments
-    l = np.sum(lines[4:8])/4
-    w = np.sum(lines[8:])/4
-    x_corners = [0.5*l, l, l, l, l, 0, 0, 0, 0]
-    y_corners = [0.5*h, 0, h, 0, h, 0, h, 0, h]
-    z_corners = [0.5*w, w, w, 0, 0, w, w, 0, 0]
-    x_corners += - np.float32(l) / 2
-    y_corners += - np.float32(h)
-    #y_corners += - np.float32(h/2)
-    z_corners += - np.float32(w) / 2
-    corners_3d = np.array([x_corners, y_corners, z_corners])    
-    if len(prediction) == 33:
-        pidx, cidx = interp_dict['bbox12']
-        parents, children = corners_3d[:, pidx], corners_3d[:, cidx]
-        lines = children - parents
-        new_joints = [(parents + interp_coef[i]*lines) for i in range(len(interp_coef))]
-        corners_3d = np.hstack([corners_3d, np.hstack(new_joints)])    
-    return corners_3d
-
-def get_observation_angle_trans(euler_angles, translations):
-    """
-    Convert orientation in camera coordinate into local coordinate system
-    utilizing known object location (translation)
-    """ 
-    alphas = euler_angles[:,1].copy()
-    for idx in range(len(euler_angles)):
-        ry3d = euler_angles[idx][1] # orientation in the camera coordinate system
-        x3d, z3d = translations[idx][0], translations[idx][2]
-        alpha = ry3d - math.atan2(-z3d, x3d) - 0.5 * math.pi
-        #alpha = ry3d - math.atan2(x3d, z3d)# - 0.5 * math.pi
-        while alpha > math.pi: alpha -= math.pi * 2
-        while alpha < (-math.pi): alpha += math.pi * 2
-        alphas[idx] = alpha
-    return alphas
-
-def get_observation_angle_proj(euler_angles, kpts, K):
-    """
-    Convert orientation in camera coordinate into local coordinate system
-    utilizing the projection of object on the image plane
-    """ 
-    f = K[0,0]
-    cx = K[0,2]
-    kpts_x = [kpts[i][0,0] for i in range(len(kpts))]
-    alphas = euler_angles[:,1].copy()
-    for idx in range(len(euler_angles)):
-        ry3d = euler_angles[idx][1] # orientation in the camera coordinate system
-        x3d, z3d = kpts_x[idx] - cx, f
-        alpha = ry3d - math.atan2(-z3d, x3d) - 0.5 * math.pi
-        #alpha = ry3d - math.atan2(x3d, z3d)# - 0.5 * math.pi
-        while alpha > math.pi: alpha -= math.pi * 2
-        while alpha < (-math.pi): alpha += math.pi * 2
-        alphas[idx] = alpha
-    return alphas
-
-def get_6d_rep(predictions, ax=None, color="black"):
-    """
-    Get the 6DoF representation of a 3D prediction.
-    """    
-    predictions = predictions.reshape(len(predictions), -1, 3)
-    all_angles = []
-    for instance_idx in range(len(predictions)):
-        prediction = predictions[instance_idx]
-        # templates are 3D boxes with no rotation
-        # the prediction is estimated as the rotation between prediction and template
-        template = get_template(prediction)
-        instance_angle, instance_trans = kpts_to_euler(template, prediction.T)        
-        all_angles.append(instance_angle.reshape(1, 3))
-    angles = np.concatenate(all_angles)
-    # the first point is the predicted point center
-    translation = predictions[:, 0, :]    
-    if ax is not None:
-        pose_vecs = np.concatenate([translation, angles], axis=1)
-        vp.draw_pose_vecs(ax, pose_vecs, color=color)
-    return angles, translation
 
 def filter_detection(detected, thres=0.7):
     """
@@ -354,8 +249,7 @@ def main():
     
     # which split to show
     split = data_cfgs['split'] # default: KITTI val split
-    dataset_inf = eval('dataset.' + data_cfgs['name']  
-                        + '.car_instance').get_dataset(cfgs, logger, split)
+    dataset_inf = libkitti.get_dataset(cfgs, logger, split)
     
     # set the dataset to inference mode
     dataset_inf.inference([True, False])
