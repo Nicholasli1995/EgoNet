@@ -175,14 +175,6 @@ def refine_solution(est_3d,
             # p3d_pred_refined[idx][1:, :] -= p3d_pred_refined[idx][[0]]    
     return
 
-
-
-
-
-
-
-
-
 def merge(dict_a, dict_b):
     for key in dict_b.keys():
         dict_a[key] = dict_b[key]
@@ -202,7 +194,7 @@ def my_collate_fn(batch):
 
 def filter_conf(record, thres=0.0):
     """
-    Filter the proposals with a confidence threshold.
+    Filter the object detections with a confidence threshold.
     """
     annots = record['raw_txt_format']
     indices = [i for i in range(len(annots)) if annots[i]['score'] >= thres]
@@ -217,14 +209,14 @@ def filter_conf(record, thres=0.0):
         }
     return True, filterd_record
 
-def gather_dict(request, references, filter_c=True):
+def gather_dict(request, references, filter_c=True, larger=True):
     """
-    Gather a dict from reference as requsted.
+    Gather a annotation dictionary from the prepared detections as requsted.
     """
     assert 'path' in request
     ret = {'path':[], 
            'boxes':[], 
-           'kpts_3d_SMOKE':[], 
+           'kpts_3d_before':[], 
            'raw_txt_format':[],
            'scores':[],
            'K':[]}
@@ -239,19 +231,22 @@ def gather_dict(request, references, filter_c=True):
         if filter_c and not success:
             continue
         ret['path'].append(img_path)
-        # ret['boxes'].append(ref['bbox_2d'])
-        # temporary hack: enlarge the bounding box from the stage 1 model
         bbox = ref['bbox_2d']
-        for instance_id in range(len(bbox)):
-            bbox[instance_id] = np.array(modify_bbox(bbox[instance_id], target_ar=1, enlarge=1.2)['bbox'])
-        # temporary hack 2: use the gt bounding box for analysis
+        if larger:
+            # enlarge the input bounding box if needed            
+            for instance_id in range(len(bbox)):
+                bbox[instance_id] = np.array(modify_bbox(bbox[instance_id], 
+                                                         target_ar=1, 
+                                                         enlarge=1.2
+                                                         )['bbox']
+                                             )
         ret['boxes'].append(bbox)
-        # 3D bounding box produced by SMOKE
-        ret['kpts_3d_SMOKE'].append(ref['kpts_3d'])
+        # 3D key-points from the detections before using Ego-Net
+        ret['kpts_3d_before'].append(ref['kpts_3d'])
+        # raw prediction strings used for later saving
         ret['raw_txt_format'].append(ref['raw_txt_format'])
         ret['scores'].append(ref['scores'])
         ret['K'].append(ref['K'])
-    #ret['kpts_3d_gt'] = request['kpts_3d_gt']
     if 'pose_vecs_gt' in request:
         ret['pose_vecs_gt'] = request['pose_vecs_gt']
     return ret
@@ -267,7 +262,7 @@ def inference(testset, model, results, cfgs):
     """
     The inference loop.
     
-    Set cfgs['visualize'] to True if you want to see the results.
+    Set cfgs['visualize'] to True if you want to view the results.
     color_dict stores plotting parameters used by Matplotlib.
     save_dict stores parameters relevant to result saving.
     """
@@ -345,7 +340,7 @@ def main():
     # set GPU
     if cfgs['use_gpu'] and torch.cuda.is_available():
         logger.info('Using GPU:{}'.format(cfgs['gpu_id']))
-        os.environ['CUDA_VISIBLE_DEVICES'] = cfgs['gpu_id']
+        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(list(map(str, cfgs['gpu_id'])))
     else:
         raise ValueError('CPU-based inference is not maintained.')
         
@@ -380,8 +375,8 @@ def main():
         results['pred'] = dataset_inf.read_predictions(input_file_path)
     
     # Initialize Ego-Net and load the pre-trained checkpoint
-    model = EgoNet(cfgs)
-    model.eval()
+    model = EgoNet(cfgs, pre_trained=True)
+    model = model.eval().cuda()
     
     # perform inference and save the (updated) predictions
     inference(dataset_inf, model, results, cfgs)       

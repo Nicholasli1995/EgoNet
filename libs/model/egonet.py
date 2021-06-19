@@ -16,7 +16,7 @@ import libs.model.FCmodel as FCmodel
 import libs.dataset.normalization.operations as nop
 import libs.visualization.points as vp
 
-from libs.common.img_proc import to_npy, resize_bbox, get_affine_transform, get_max_preds, generate_xy_map
+from libs.common.img_proc import to_npy, resize_bbox, get_affine_transform, get_max_preds, generate_xy_map, modify_bbox
 from libs.common.img_proc import affine_transform_modified, cs2bbox, simple_crop, enlarge_bbox
 from libs.common.format import save_txt_file
 
@@ -38,6 +38,11 @@ class EgoNet(nn.Module):
         method_str = 'models.heatmapModel.' + hm_model_name + '.get_pose_net'
         self.HC = eval(method_str)(cfgs, is_train=False)
         self.resolution = cfgs['heatmapModel']['input_size']
+        # optional channel augmentation
+        if 'add_xy' in cfgs['heatmapModel']:
+            self.xy_dict = {'flag':cfgs['heatmapModel']['add_xy']}
+        else:
+            self.xy_dict = None
         # initialize a lifing model
         # this corresponds to L in Equation (2) 
         self.L = FCmodel.get_fc_model(stage_id=1, 
@@ -64,7 +69,7 @@ class EgoNet(nn.Module):
         """
         bbox = to_npy(bbox)
         target_ar = resolution[0] / resolution[1]
-        ret = self.modify_bbox(bbox, target_ar)
+        ret = modify_bbox(bbox, target_ar)
         c, s, r = ret['c'], ret['s'], 0.
         # xy_dict: parameters for adding xy coordinate maps
         trans = get_affine_transform(c, s, r, resolution)
@@ -79,7 +84,15 @@ class EgoNet(nn.Module):
             instance = np.concatenate([instance, xymap.astype(np.float32)], axis=2)        
         instance = instance if pth_trans is None else pth_trans(instance)
         return instance
-
+    
+    def load_cv2(self, path, rgb=True):
+        data_numpy = cv2.imread(path, 1 | 128)    
+        if data_numpy is None:
+            raise ValueError('Fail to read {}'.format(path))    
+        if rgb:
+            data_numpy = cv2.cvtColor(data_numpy, cv2.COLOR_BGR2RGB)         
+        return data_numpy
+    
     def crop_instances(self, 
                        annot_dict, 
                        resolution, 
@@ -91,16 +104,11 @@ class EgoNet(nn.Module):
         Crop input instances given an annotation dictionary.
         """
         all_instances = []
-        # each record describes one instance
+        # each record stores attributes of one instance
         all_records = []
         target_ar = resolution[0] / resolution[1]
         for idx, path in enumerate(annot_dict['path']):
-            #print(path)
-            data_numpy = cv2.imread(path, 1 | 128)    
-            if data_numpy is None:
-                raise ValueError('Fail to read {}'.format(path))    
-            if rgb:
-                data_numpy = cv2.cvtColor(data_numpy, cv2.COLOR_BGR2RGB) 
+            data_numpy = self.load_cv2(path)
             boxes = annot_dict['boxes'][idx]
             if 'labels' in annot_dict:
                 labels = annot_dict['labels'][idx]
@@ -121,7 +129,7 @@ class EgoNet(nn.Module):
                                                      xy_dict=xy_dict
                                                      )
                 bbox = to_npy(bbox)
-                ret = self.modify_bbox(bbox, target_ar)
+                ret = modify_bbox(bbox, target_ar)
                 c, s, r = ret['c'], ret['s'], 0.
                 all_instances.append(torch.unsqueeze(instance, dim=0))
                 all_records.append({
@@ -423,7 +431,21 @@ class EgoNet(nn.Module):
                                                       alpha_mode=alpha_mode
                                                       )      
         return records
-
+    
+    def new_img_dict(self):
+        """
+        An empty dictionary for image-level records.
+        """
+        img_dict = {'center':[], 
+                    'scale':[], 
+                    'rotation':[], 
+                    'bbox_resize':[], # resized bounding box 
+                    'kpts_2d_pred':[], 
+                    'label':[], 
+                    'score':[] 
+                    }        
+        return img_dict
+    
     def get_keypoints(self,
                       instances, 
                       records,
@@ -437,46 +459,30 @@ class EgoNet(nn.Module):
         if is_cuda:
             instances = instances.cuda()
         output = self.HC(instances)
-        if type(output) is tuple:
-            pred, max_vals = output[1].data.cpu().numpy(), None  
-            
-        elif arg_max == 'hard':
-            if not isinstance(output, np.ndarray):
-                output = output.data.cpu().numpy()
-            pred, max_vals = get_max_preds(output)
-        else:
-            raise NotImplementedError
-        if type(output) is tuple:
-            pred *= image_size[0]
-        else:
-            pred *= image_size[0]/output.shape[3]
+        # local part coordinates
+        local_coord = output[1].data.cpu().numpy()
+        local_coord *= self.resolution[0]
+        # transform local part coordinates to screen coordinates
         centers = [records[i]['center'] for i in range(len(records))]
         scales = [records[i]['scale'] for i in range(len(records))]
         rots = [records[i]['rotation'] for i in range(len(records))]    
-        for sample_idx in range(len(pred)):
-            trans_inv = get_affine_transform(centers[sample_idx],
-                                             scales[sample_idx], 
-                                             rots[sample_idx], 
-                                             image_size, 
-                                             inv=1)
-            pred_src_coordinates = affine_transform_modified(pred[sample_idx], 
-                                                                 trans_inv) 
-            record = records[sample_idx]
-            # pred_src_coordinates += np.array([[record['bbox'][0], record['bbox'][1]]])
-            records[sample_idx]['kpts'] = pred_src_coordinates
+        for instance_idx in range(len(local_coord)):
+            trans_inv = get_affine_transform(centers[instance_idx],
+                                             scales[instance_idx], 
+                                             rots[instance_idx], 
+                                             self.resolution, 
+                                             inv=1
+                                             )
+            screen_coord = affine_transform_modified(local_coord[instance_idx], 
+                                                     trans_inv
+                                                     ) 
+            records[instance_idx]['kpts'] = screen_coord
         # assemble a dictionary where each key corresponds to one image
         ret = {}
         for record in records:
             path = record['path']
             if path not in ret:
-                ret[path] = {'center':[], 
-                             'scale':[], 
-                             'rotation':[], 
-                             'bbox_resize':[], # resized bounding box
-                             'kpts_2d_pred':[], 
-                             'label':[], 
-                             'score':[]
-                             }
+                ret[path] = self.new_img_dict()
             ret[path]['kpts_2d_pred'].append(record['kpts'].reshape(1, -1))
             ret[path]['center'].append(record['center'])
             ret[path]['scale'].append(record['scale'])
@@ -486,7 +492,7 @@ class EgoNet(nn.Module):
             ret[path]['rotation'].append(record['rotation'])
         return ret
 
-    def lift_2d_to_3d(self, records, template, cuda=True):
+    def lift_2d_to_3d(self, records, cuda=True):
         """
         Foward-pass of the lifter sub-model.
         """      

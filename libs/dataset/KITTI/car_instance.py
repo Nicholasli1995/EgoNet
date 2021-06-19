@@ -117,7 +117,7 @@ class KITTI(bc.SupervisedDataset):
     def __init__(self, cfgs, split, logger, scale=1.0, use_stereo=False):
         super().__init__(cfgs, split, logger)
         self.logger = logger
-        self.logger.info("Initializing KITTI {:s} set, Please wait...".format(split))
+        self.logger.info("Initializing KITTI {:s} set, please wait...".format(split))
         self.exp_type = cfgs['exp_type'] # exp_type: experiment type 
         self._data_dir = cfgs['dataset']['root'] # root directory
         self._classes = cfgs['dataset']['detect_classes'] # used object classes
