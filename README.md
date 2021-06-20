@@ -13,7 +13,7 @@ News:
 </p>
 
 ## Run a demo with a one-line command!
-Check instructions [here](https://github.com/Nicholasli1995/EgoNet/blob/master/docs/DEMO.md).
+Check instructions [here](https://github.com/Nicholasli1995/EgoNet/blob/master/docs/demo.md).
 <p align="center">
   <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/Ego-Net_demo.png" height="175"/>
   <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/Ego-Net_demo.gif" height="175"/>
@@ -46,10 +46,10 @@ Check instructions [here](https://github.com/Nicholasli1995/EgoNet/blob/master/d
 |[Ours](http://www.cvlibs.net/datasets/kitti/eval_object_detail.php?&result=e5233225fd5ef36fa63eb00252d9c00024961f2c)           |CVPR 2021 |Monocular|**96.11**|**91.23**|**80.96**|
 
 ## Inference/Deployment
-Check instructions here to **reproduce** the above quantitative results.
+Check instructions [here](https://github.com/Nicholasli1995/EgoNet/blob/master/docs/inference.md) to **reproduce** the above quantitative results.
 
 ## Training
-To be updated.
+Check instructions [here](https://github.com/Nicholasli1995/EgoNet/blob/master/docs/training.md) to train Ego-Net and learn how to prepare your own training dataset other than KITTI.
 
 ## Citation
 Please star this repository and cite the following paper in your publications if it helps your research:
