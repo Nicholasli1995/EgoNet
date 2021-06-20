@@ -28,6 +28,16 @@ Your data folder should look like this:
 ## Download pre-trained model
 You need to download the pre-trained checkpoints [here](https://drive.google.com/file/d/1JsVzw7HMfchxOXoXgvWG1I_bPRD1ierE/view?usp=sharing) in order to use Ego-Net. Unzip it to ${YOUR_MODEL_DIR}.
 
+## Compile the official evaluator
+Go to the folder storing the source code
+```bash
+cd ${EgoNet_DIR}/tools/kitti-eval 
+```
+Compile the source code
+```bash
+g++ -o evaluate_object_3d_offline evaluate_object_3d_offline.cpp -O3
+```
+
 ## Environment
 You need to create an environment that meets the following dependencies. 
 
