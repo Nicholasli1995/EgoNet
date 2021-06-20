@@ -38,6 +38,10 @@ Compile the source code
 g++ -o evaluate_object_3d_offline evaluate_object_3d_offline.cpp -O3
 ```
 
+## Download the input bounding boxes
+Download the [resources folder](https://drive.google.com/drive/folders/1atfXLmsLFG6XEtNnwZuEYLydKqjr7Icf?usp=sharing) and unzip its contents. Place the resource folder at ${EgoNet_DIR}/resources
+
+
 ## Environment
 You need to create an environment that meets the following dependencies. 
 
