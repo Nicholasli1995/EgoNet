@@ -40,36 +40,6 @@ def filter_detection(detected, thres=0.7):
         filtered.append(tempt_dict)
     return filtered
 
-def refine_solution(est_3d, 
-                    est_2d, 
-                    K, 
-                    dist_coeffs, 
-                    refine_func, 
-                    output_arr, 
-                    output_flags, 
-                    gts=None, 
-                    ax=None
-                    ):
-    """
-    Refine 3D prediction by minimizing re-projection error.
-    est: estimates [N, 9, 3]
-    K: intrinsics    
-    """      
-    for idx in range(len(est_3d)):
-        success, refined_prediction = refine_func(est_3d[idx],
-                                                  est_2d[idx],
-                                                  K,
-                                                  dist_coeffs,
-                                                  gts=gts,
-                                                  ax=ax)
-        if success:
-            # update the refined solution
-            output_arr[idx] = refined_prediction.T
-            output_flags[idx] = True
-            # # convert to the center-relative shape representation
-            # p3d_pred_refined[idx][1:, :] -= p3d_pred_refined[idx][[0]]    
-    return
-
 def merge(dict_a, dict_b):
     for key in dict_b.keys():
         dict_a[key] = dict_b[key]
@@ -230,7 +200,8 @@ def main():
     logger, final_output_dir = liblogger.get_logger(cfgs)   
     
     # save a copy of the experiment configuration
-    shutil.copyfile(cfgs['config_path'], os.path.join(final_output_dir, 'saved_config.yml'))
+    save_cfg_path = os.path.join(final_output_dir, 'saved_config.yml')
+    shutil.copyfile(cfgs['config_path'], save_cfg_path)
     
     # set GPU
     if cfgs['use_gpu'] and torch.cuda.is_available():

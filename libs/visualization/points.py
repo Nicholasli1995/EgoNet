@@ -1,5 +1,6 @@
 """
 Visualization utilities for 2D and 3D points based on Matplotlib.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """

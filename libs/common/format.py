@@ -67,4 +67,5 @@ def save_txt_file(img_path, prediction, params):
     save_path = os.path.join(params['save_dir'], file_name) 
     with open(save_path, 'w') as f:
         f.write(prediction['pred_str'])
+    print('Wrote prediction file at {:s}'.format(save_path))
     return
