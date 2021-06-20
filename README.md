@@ -12,6 +12,13 @@ News:
   <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/teaser.jpg"  width="830" height="200" />
 </p>
 
+## Run a demo with a one-line command!
+Check instructions [here](https://github.com/Nicholasli1995/EgoNet/blob/master/docs/DEMO.md).
+<p align="center">
+  <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/Ego-Net_demo.png" height="200"/>
+  <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/Ego-Net_demo.gif" height="200"/>
+</p>
+
 ## Performance: AP<sup>BEV</sup>@R<sub>40</sub> on KITTI val set for Car (monocular RGB)
 
 | Method                    | Reference|Easy|Moderate|Hard|
@@ -39,7 +46,7 @@ News:
 |[Ours](http://www.cvlibs.net/datasets/kitti/eval_object_detail.php?&result=e5233225fd5ef36fa63eb00252d9c00024961f2c)           |CVPR 2021 |Monocular|**96.11**|**91.23**|**80.96**|
 
 ## Inference/Deployment
-Coming soon.
+Check instructions here to **reproduce** the above quantitative results.
 
 ## Training
 To be updated.
