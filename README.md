@@ -15,8 +15,8 @@ News:
 ## Run a demo with a one-line command!
 Check instructions [here](https://github.com/Nicholasli1995/EgoNet/blob/master/docs/DEMO.md).
 <p align="center">
-  <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/Ego-Net_demo.png" height="200"/>
-  <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/Ego-Net_demo.gif" height="200"/>
+  <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/Ego-Net_demo.png" height="175"/>
+  <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/Ego-Net_demo.gif" height="175"/>
 </p>
 
 ## Performance: AP<sup>BEV</sup>@R<sub>40</sub> on KITTI val set for Car (monocular RGB)
