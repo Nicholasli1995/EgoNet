@@ -1,0 +1,175 @@
+# This is a YAML file storing experimental configurations for KITTI dataset
+
+## general settings
+name: 'refine a given set of predictions from D4LCN'
+exp_type: 'inference'
+model_type: 'heatmapModel'
+use_gpu: True
+use_pred_box: True
+use_gt_box: True
+gpu_id: [0]
+
+## operations
+train: False
+save: False
+evaluate: False
+inference: True
+
+## used directories
+dirs:
+    # output directory
+    output: 'YOUR_OURPUT_DIR' 
+    ckpt: 'YOUR_PRETRAINED_DIR' 
+    load_prediction_file: '../resources/D4LCN/data'
+
+## CUDNN settings
+cudnn:
+    enabled: True
+    deterministic: True
+    benchmark: False
+
+## dataset settings
+dataset:
+    name: 'KITTI'
+    split: 'valid'
+    detect_classes: ['Car']
+    3d_kpt_sample_style: 'bbox9'
+    # interpolate the 3D bbox
+    interpolate:
+        flag: True
+        style: 'bbox12'
+        coef: [0.332, 0.667]
+    # do some pre-processing
+    pre-process: False
+    root: 'YOUR_KITTI_DIR'
+    # augmentation parameters
+    scaling_factor: 0.2
+    rotation_factor: 30. # degrees
+    # pytorch image transformation setting
+    pth_transform:
+# mean: [0.485, 0.456, 0.406, 0., 0.] 
+# std: [0.229, 0.224, 0.225, 1., 1.]    
+        mean: [0.485, 0.456, 0.406] 
+        std: [0.229, 0.224, 0.225]          
+    # annotation style for 2d key-point
+    2d_kpt_style: 'bbox9' # projected 3d bounding box corner and center points
+    # input-output representation for 2d-to-3d lifting
+    lft_in_rep: 'coordinates2d' # 2d coordinates on screen
+    lft_out_rep: 'R3d+T' # 3d coordinates relative to centroid plus translation vector   
+
+## model settings for a fully-connected network if used
+FCModel:
+    name: 'lifter'
+    refine_3d: False 
+    norm_twoD: False
+    num_blocks: 2 
+    input_size: 66 
+    output_size: 96 
+    num_neurons: 1024
+    dropout: 0.5
+    leaky: False
+
+## settings for a fully-convolutional heatmap/coordinate regression model
+heatmapModel:
+    name: hrnet # here a high-resolution (hr) model is used
+    add_xy: False # concatenate xy coodrinate maps along with the input
+    jitter_bbox: True
+    jitter_params:
+        shift:
+        - 0.1
+        - 0.1
+        scaling:
+        - 0.4
+        - 0.4
+    input_size: 
+    - 256
+    - 256
+    # rotate and scaling and input images
+    augment_input: False
+    # one can choose to regress dense semantic heatmaps or coordinates 
+    head_type: 'coordinates'
+    # up-sampling with pixel-shuffle
+    pixel_shuffle: False
+    # if an intermediate heatmap is produced
+    heatmap_size:
+    - 64
+    - 64
+    loss_type: JointsCompositeLoss
+    # the following two settings are only valid for JointsCompositeLoss
+    loss_spec_list: ['mse', 'l1', 'sl1']
+    loss_weight_list: [1.0, 0.1, 0.005]
+    cr_loss_threshold: 0.1
+    init_weights: true
+    num_joints: 33
+    use_different_joints_weight: False
+    target_type: gaussian
+    sigma: 2
+    extra:
+        pretrained_layers:
+        - 'conv1'
+        - 'bn1'
+        - 'conv2'
+        - 'bn2'
+        - 'layer1'
+        - 'transition1'
+        - 'stage2'
+        - 'transition2'
+        - 'stage3'
+        - 'transition3'
+        - 'stage4'
+        final_conv_kernel: 1
+        stage2:
+            num_modules: 1
+            num_branches: 2
+            block: basic
+            num_blocks:
+            - 4
+            - 4
+            num_channels:
+            - 48
+            - 96
+            fuse_method: sum
+        stage3:
+            num_modules: 4
+            num_branches: 3
+            block: basic
+            num_blocks:
+            - 4
+            - 4
+            - 4
+            num_channels:
+            - 48
+            - 96
+            - 192
+            fuse_method: sum
+        stage4:
+            num_modules: 3
+            num_branches: 4
+            block: basic
+            num_blocks:
+            - 4
+            - 4
+            - 4
+            - 4
+            num_channels:
+            - 48
+            - 96
+            - 192
+            - 384
+            fuse_method: sum
+
+## testing settings
+testing_settings:
+    batch_size: 1
+    num_threads: 0
+    shuffle: False
+    pin_memory: False
+    apply_dropout: False
+    unnormalize: False
+    alpha_mode: 'proj'
+    
+## detailed settings for the used metrics
+metrics:
+    R3D:
+        T_style: 'direct'
+        R_style: 'euler'
