@@ -12,6 +12,7 @@ import cv2
 import math
 
 from scipy.spatial.transform import Rotation
+from os.path import join as pjoin
 
 import libs.model as models
 import libs.model.FCmodel as FCmodel
@@ -57,10 +58,13 @@ class EgoNet(nn.Module):
                                       )
         if pre_trained:
             # load pre-trained checkpoints
-            self.HC.load_state_dict(torch.load(cfgs['dirs']['load_hm_model']))
+            HC_path = pjoin(cfgs['dirs']['ckpt'], 'HC.pth')
+            L_path = pjoin(cfgs['dirs']['ckpt'], 'L.pth')
+            LS_path = pjoin(cfgs['dirs']['ckpt'], 'LS.pth')
+            self.HC.load_state_dict(torch.load(HC_path))
             # the statistics used by the lifter for normalizing inputs
-            self.LS = np.load(cfgs['dirs']['load_stats'], allow_pickle=True).item()
-            self.L.load_state_dict(torch.load(cfgs['dirs']['load_lifter']))
+            self.LS = np.load(LS_path, allow_pickle=True).item()
+            self.L.load_state_dict(torch.load(L_path))
     
     def crop_single_instance(self, 
                              img, 
