@@ -25,6 +25,9 @@ import shutil
 import torch
 import numpy as np
 import os
+import subprocess
+import matplotlib.pyplot as plt
+plt.ion()
 
 def filter_detection(detected, thres=0.7):
     """
@@ -175,9 +178,11 @@ def inference(testset, model, results, cfgs):
                                                     },
                                          alpha_mode=cfgs['testing_settings']['alpha_mode']
                                          )   
+        if cfgs['visualize']:
+            input("Press Enter to view next batch.")
         # set batch_to_show to a small number if you need to visualize 
         if batch_idx >= cfgs['batch_to_show'] - 1:
-            break     
+            break  
     return
 
 def generate_empty_file(output_dir, label_dir):
@@ -228,7 +233,6 @@ def main():
     # read annotations
     input_file_path = cfgs['dirs']['load_prediction_file']
     # the record for 2D and 3D predictions
-    # key->value: name of the approach->dictionary storing the predictions
     results = {}
     # confidence_thres = cfgs['conf_thres']
     
@@ -245,20 +249,24 @@ def main():
     
     # perform inference and save the (updated) predictions
     inference(dataset_inf, model, results, cfgs)       
+    if cfgs['visualize']:
+        return
     
-    # then you can run kitti-eval for evaluation
-    evaluator = cfgs['dirs']['kitti_evaluator']
-    label_dir = cfgs['dirs']['kitti_label']
+    evaluator = "./kitti-eval/evaluate_object_3d_offline"
+    label_dir = os.path.join(cfgs['dataset']['root'], 'training', 'label_2')
     output_dir = os.path.join(cfgs['dirs']['output'], 'submission')
     
     # When generating submission files for the test split,
     # if no detections are produced for one image, generate an empty file
-    #generate_empty_file(output_dir, label_dir)
+    if cfgs['dataset']['split'] == 'test':
+        generate_empty_file(output_dir, label_dir)
+        return
+    
+    # run kitti-eval to produce official evaluation
     command = "{} {} {}".format(evaluator, label_dir, output_dir)
-    # e.g.
-    # ~/Documents/Github/SMOKE/smoke/data/datasets/evaluation/kitti/kitti_eval/evaluate_object_3d_offline /home/nicholas/Documents/Github/SMOKE/datasets/kitti/training/label_2 /media/nicholas/Database/experiments/3DLearning/0826
-    # /media/nicholas/Database/Github/M3D-RPN/data/kitti_split1/devkit/cpp/evaluate_object /home/nicholas/Documents/Github/SMOKE/datasets/kitti/training/label_2 /media/nicholas/Database/Github/M3D-RPN/output/tmp_results
-    return
+    output = subprocess.check_output(command, shell=True)
+    print(output.decode())
+    return output
 
 if __name__ == "__main__":
     main()

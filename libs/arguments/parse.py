@@ -1,5 +1,6 @@
 """
 Argument parser for command line inputs and experiment configuration file.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
@@ -21,11 +22,21 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(description='a general parser')
     # path to the configuration file
-    parser.add_argument('cfg',
+    parser.add_argument('--cfg',
                         help='experiment configuration file path',
                         type=str
                         )
+    parser.add_argument('--visualize',
+                        default=False,
+                        type=bool
+                        )    
+    parser.add_argument('--batch_to_show',
+                        default=1000000,
+                        type=int
+                        )    
     args, unknown = parser.parse_known_args()
     configs = read_yaml_file(args.cfg)   
-    configs['config_path'] = args.cfg      
+    configs['config_path'] = args.cfg
+    configs['visualize'] = args.visualize
+    configs['batch_to_show'] = args.batch_to_show
     return configs
