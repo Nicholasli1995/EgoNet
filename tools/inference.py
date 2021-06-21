@@ -77,7 +77,7 @@ def filter_conf(record, thres=0.0):
         }
     return True, filterd_record
 
-def gather_dict(request, references, filter_c=True, larger=True):
+def gather_dict(request, references, filter_c=True, larger=True, thres=0.):
     """
     Gather a annotation dictionary from the prepared detections as requsted.
     """
@@ -95,7 +95,7 @@ def gather_dict(request, references, filter_c=True, larger=True):
             continue
         ref = references[img_name]
         if filter_c:
-            success, ref = filter_conf(ref)
+            success, ref = filter_conf(ref, thres=thres)
         if filter_c and not success:
             continue
         ret['path'].append(img_path)
@@ -158,7 +158,8 @@ def inference(testset, model, results, cfgs):
             merge(all_records, record)
         if cfgs['use_pred_box']:
             # use detected bounding box from any 2D/3D detector
-            annot_dict = gather_dict(meta, results['pred'])
+            thres = cfgs['conf_thres'] if 'conf_thres' in cfgs else 0.
+            annot_dict = gather_dict(meta, results['pred'], thres=thres)
             if len(annot_dict['path']) == 0:
                 continue
             record2 = model(annot_dict)
@@ -192,7 +193,9 @@ def generate_empty_file(output_dir, label_dir):
     all_files = os.listdir(label_dir)
     detected = os.listdir(os.path.join(output_dir, 'data'))
     for file_name in all_files:
-        if file_name[:-4] + ".txt" not in detected:
+        if not file_name.endswith(".txt"):
+            continue
+        if file_name not in detected:
             file = open(os.path.join(output_dir, 'data', file_name[:-4] + '.txt'), 'w')
             file.close()
     return
@@ -234,7 +237,6 @@ def main():
     input_file_path = cfgs['dirs']['load_prediction_file']
     # the record for 2D and 3D predictions
     results = {}
-    # confidence_thres = cfgs['conf_thres']
     
     # flags: the user can choose to use which type of input bounding boxes to use
     # use_gt_box can be used to re-produce the experiments simulating perfect 2D detection
@@ -259,7 +261,8 @@ def main():
     # When generating submission files for the test split,
     # if no detections are produced for one image, generate an empty file
     if cfgs['dataset']['split'] == 'test':
-        generate_empty_file(output_dir, label_dir)
+        test_calib_dir = os.path.join(cfgs['dataset']['root'], 'testing', 'calib')
+        generate_empty_file(output_dir, test_calib_dir)
         return
     
     # run kitti-eval to produce official evaluation
