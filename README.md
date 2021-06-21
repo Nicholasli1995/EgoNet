@@ -63,7 +63,7 @@ Please star this repository and cite the following paper in your publications if
     month     = {June},
     year      = {2021},
     pages     = {1873-1883}
-}
+    }
 
 ## License
 This repository can be used freely for non-commercial purposes. Contact me if you are interested in a commercial license.
