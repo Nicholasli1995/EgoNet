@@ -73,7 +73,7 @@ FCModel:
 heatmapModel:
     name: hrnet # here a high-resolution (hr) model is used
     add_xy: False # concatenate xy coodrinate maps along with the input
-    jitter_bbox: True
+    jitter_bbox: False
     jitter_params:
         shift:
         - 0.1
@@ -94,16 +94,8 @@ heatmapModel:
     heatmap_size:
     - 64
     - 64
-    loss_type: JointsCompositeLoss
-    # the following two settings are only valid for JointsCompositeLoss
-    loss_spec_list: ['mse', 'l1', 'sl1']
-    loss_weight_list: [1.0, 0.1, 0.005]
-    cr_loss_threshold: 0.1
     init_weights: true
     num_joints: 33
-    use_different_joints_weight: False
-    target_type: gaussian
-    sigma: 2
     extra:
         pretrained_layers:
         - 'conv1'
@@ -162,14 +154,8 @@ heatmapModel:
 testing_settings:
     batch_size: 1
     num_threads: 0
-    shuffle: False
+    shuffle: True
     pin_memory: False
     apply_dropout: False
     unnormalize: False
     alpha_mode: 'proj'
-    
-## detailed settings for the used metrics
-metrics:
-    R3D:
-        T_style: 'direct'
-        R_style: 'euler'

@@ -488,10 +488,10 @@ class KITTI(bc.SupervisedDataset):
                             'sf': cfgs['dataset']['scaling_factor'],
                             'rf': cfgs['dataset']['rotation_factor'],
                             'num_joints': hm['num_joints'],
-                            'sigma': hm['sigma'],
-                            'target_type': hm['target_type'],
+                            'sigma': hm['sigma'] if 'sigma' in hm else None,
+                            'target_type': hm['target_type'] if 'target_type' in hm else None,
                             'use_different_joints_weight': 
-                                hm['use_different_joints_weight']                               
+                                hm['use_different_joints_weight'] if 'use_different_joints_weight' in hm else None                            
                               }
             self.num_joints = hm['num_joints']
         # parameters relevant to PyTorch image transformation operations

@@ -60,7 +60,7 @@ class EgoNet(nn.Module):
             # load pre-trained checkpoints
             HC_path = pjoin(cfgs['dirs']['ckpt'], 'HC.pth')
             L_path = pjoin(cfgs['dirs']['ckpt'], 'L.pth')
-            LS_path = pjoin(cfgs['dirs']['ckpt'], 'LS.pth')
+            LS_path = pjoin(cfgs['dirs']['ckpt'], 'LS.npy')
             self.HC.load_state_dict(torch.load(HC_path))
             # the statistics used by the lifter for normalizing inputs
             self.LS = np.load(LS_path, allow_pickle=True).item()
