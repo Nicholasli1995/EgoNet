@@ -44,14 +44,19 @@ Download the [resources folder](https://drive.google.com/drive/folders/1atfXLmsL
 
 ## Environment
 You need to create an environment that meets the following dependencies. 
+The versions included in the parenthesis are **tested**. Other versions may also work but are **not tested**.
 
-- Python 3
-- Numpy 
-- PyTorch (GPU required)
-- Scipy
-- Matplotlib
-- OpenCV
-- PyYAML
+- Python (3.7.9)
+- Numpy (1.19.2)
+- PyTorch (1.6.0, GPU required)
+- Scipy (1.5.2)
+- Matplotlib (3.3.4)
+- OpenCV (3.4.2)
+- pyyaml (5.4.1)
 
-To refer to an tested environment, see [spec-list.txt](test). Other versions may work but are not tested.
-The recommended environment manager is Anaconda, which can create an environment using this provided spec-list. 
+For more details of my tested local environment, refer to [spec-list.txt](https://github.com/Nicholasli1995/EgoNet/blob/master/docs/spec-list.txt). 
+The recommended environment manager is [Anaconda](https://www.anaconda.com/), which can create an environment using this provided spec-list. 
+For debugging using an IDE, I personally use and recommend Spyder 4.2 which you can get by
+```bash
+conda install spyder
+```
