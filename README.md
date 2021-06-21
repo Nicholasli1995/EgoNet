@@ -4,7 +4,9 @@ Official project website for the CVPR 2021 paper "Exploring intermediate represe
 
 News:
 
-(2021-06-16): **This repo is under final code cleaning and documentation preparation.** Stay tuned and come back in a week!
+(2021-06-21): v-0.9 (beta version) is released. **The inference utility is here!** For Q&A, go to [discussions](https://github.com/Nicholasli1995/EgoNet/discussions). If you believe there is a technical problem, submit to [issues](https://github.com/Nicholasli1995/EgoNet/issues). 
+
+(2021-06-16): This repo is under final code cleaning and documentation preparation. Stay tuned and come back in a week!
 
 **Check our 5-min video ([Youtube](https://www.youtube.com/watch?v=isKo0F3MU68), [爱奇艺](https://www.iqiyi.com/v_y6lrdy33kg.html)) for an introduction.**
 
