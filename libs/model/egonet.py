@@ -17,7 +17,6 @@ from os.path import join as pjoin
 import libs.model as models
 import libs.model.FCmodel as FCmodel
 import libs.dataset.normalization.operations as nop
-import libs.visualization.points as vp
 import libs.visualization.egonet_utils as vego
 import libs.common.transformation as ltr
 
@@ -237,7 +236,8 @@ class EgoNet(nn.Module):
 
     def get_template(self, prediction, interp_coef=[0.332, 0.667]):
         """
-        Construct a template 3D cuboid used for computing a rigid transformation.
+        Construct a template 3D cuboid at canonical pose. The 3D cuboid is 
+        represented as part coordinates in the camera coordinate system.
         """ 
         parents = prediction[interp_dict['bbox12'][0] - 1]
         children = prediction[interp_dict['bbox12'][1] - 1]

@@ -9,7 +9,6 @@ import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
-
 import math
 import os
 
@@ -22,14 +21,13 @@ def transform_preds(coords, center, scale, output_size):
         target_coords[p, 0:2] = affine_transform(coords[p, 0:2], trans)
     return target_coords
 
-def get_affine_transform(
-        center, 
-        scale, 
-        rot, 
-        output_size,
-        shift=np.array([0, 0], dtype=np.float32), 
-        inv=0
-        ):
+def get_affine_transform(center, 
+                         scale, 
+                         rot, 
+                         output_size,
+                         shift=np.array([0, 0], dtype=np.float32), 
+                         inv=0
+                         ):
     # TODO: speed up this function
     if isinstance(scale, list):
         scale = np.array(scale)
@@ -61,7 +59,6 @@ def get_affine_transform(
 
     return trans
 
-
 def affine_transform(pt, t):
     new_pt = np.array([pt[0], pt[1], 1.]).T
     new_pt = np.dot(t, new_pt)
@@ -89,16 +86,17 @@ def get_dir(src_point, rot_rad):
 def crop(img, center, scale, output_size, rot=0):
     trans = get_affine_transform(center, scale, rot, output_size)
 
-    dst_img = cv2.warpAffine(
-        img, trans, (int(output_size[0]), int(output_size[1])),
-        flags=cv2.INTER_LINEAR
-    )
+    dst_img = cv2.warpAffine(img, 
+                             trans, 
+                             (int(output_size[0]), int(output_size[1])),
+                             flags=cv2.INTER_LINEAR
+                             )   
 
     return dst_img
 
 def simple_crop(input_image, center, crop_size):
     '''
-    simple cropping without warping
+    Simple cropping without warping
     '''    
     assert len(input_image.shape) == 3, 'Unsupported image format.'
     channel = input_image.shape[2]

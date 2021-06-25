@@ -9,6 +9,9 @@ import yaml
 import argparse
 
 def read_yaml_file(path):
+    """
+    Read a .yml file.
+    """
     try: 
         with open (path, 'r') as file:
             configs = yaml.safe_load(file)
@@ -18,7 +21,9 @@ def read_yaml_file(path):
 
 def parse_args():
     """
-    Read an .yml experiment configuration file whose path is provided by the user.
+    Read a .yml experiment configuration file whose path is provided by the user.
+    
+    You can add more arguments and modify configs accordingly.
     """
     parser = argparse.ArgumentParser(description='a general parser')
     # path to the configuration file

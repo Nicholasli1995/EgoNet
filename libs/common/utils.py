@@ -1,5 +1,6 @@
 """
 Common utilities.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """

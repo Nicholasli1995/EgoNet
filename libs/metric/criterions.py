@@ -1,5 +1,6 @@
 """
 Metric functions used for validation.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
@@ -12,7 +13,7 @@ import numpy as np
 import torch
 from scipy.spatial.transform import Rotation
 
-PCK_THRES = np.array([0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5])
+PCK_THRES = np.array([0.1, 0.2, 0.3])
 
 def get_distance(gt, pred):
     """
