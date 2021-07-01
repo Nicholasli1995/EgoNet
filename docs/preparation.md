@@ -1,6 +1,6 @@
 ## Data Preparation 
 You need to download KITTI dataset [here](http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d). Download left images, calibration files and labels.
-Download the split files here and place them at ${YOUR_KITTI_DIR}/SPLIT/ImageSets.
+Download the split files [here](https://drive.google.com/drive/folders/1YLtptqspOFw08QG2MsxewDT9tjF2O45g?usp=sharing) and place them at ${YOUR_KITTI_DIR}/SPLIT/ImageSets.
 Your data folder should look like this:
 
    ```
