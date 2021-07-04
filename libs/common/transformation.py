@@ -1,6 +1,6 @@
-# -*- coding: utf-8 -*-
 """
 Coordinate transformation functions.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
@@ -192,5 +192,3 @@ def pnp_refine(prediction, observation, intrinsics, dist_coeffs):
     else:
         refined_prediction = cv2.Rodrigues(R)[0] @ prediction.T + T    
         return refined_prediction
-    
-    
