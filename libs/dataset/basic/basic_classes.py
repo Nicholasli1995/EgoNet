@@ -24,7 +24,9 @@ class SupervisedDataset(torch.utils.data.Dataset):
         return
     
     def normalize(self, statistics=None):
-        # normalize the input-output pairs with optional given statistics
+        """ 
+        Normalize the (input, output) pairs with optional statistics.
+        """
         if statistics is None:
             mean_in, std_in = nop.get_statistics_1d(self.input)
             mean_out, std_out = nop.get_statistics_1d(self.output)

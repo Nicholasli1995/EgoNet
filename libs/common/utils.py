@@ -15,10 +15,13 @@ import os
 from os.path import join as pjoin
 from collections import namedtuple
 
-def make_dir(filename):
-    if not os.path.exists(os.path.dirname(filename)):
+def make_dir(name):
+    """    
+    Create a directory.
+    """
+    if not os.path.exists(os.path.dirname(name)):
         try:
-            os.makedirs(os.path.dirname(filename))
+            os.makedirs(os.path.dirname(name))
         except OSError as exc:
             print('make_dir failed.')
             raise exc
@@ -29,15 +32,10 @@ def save_checkpoint(states, is_best, output_dir, filename='checkpoint.pth'):
     if is_best and 'state_dict' in states:
         torch.save(states['best_state_dict'], pjoin(output_dir, 'model_best.pth'))
 
-
 def get_model_summary(model, *input_tensors, item_length=26, verbose=False):
     """
-    summarize a model. For now only convolution, batch normalization and 
+    Summarize a model. For now only convolution, batch normalization and 
     linear layers are considered for parameters and FLOPs.
-    :param model:
-    :param input_tensors:
-    :param item_length:
-    :return:
     """
     summary = []
     ModuleDetails = namedtuple(
@@ -149,7 +147,9 @@ def get_model_summary(model, *input_tensors, item_length=26, verbose=False):
     return details
 
 class AverageMeter(object):
-    """Computes and stores the average and current value"""
+    """
+    An averaege meter object that computes and stores the average and current value.
+    """
     def __init__(self):
         self.reset()
         self.PCK_stats = {}

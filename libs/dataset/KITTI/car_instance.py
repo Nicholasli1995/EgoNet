@@ -1,5 +1,6 @@
 """
-Python class for KITTI dataset. 
+KITTI dataset implemented as PyTorch dataset object.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
@@ -7,16 +8,16 @@ Contact: nicholas.li@connect.ust.hk
 import libs.dataset.basic.basic_classes as bc
 import libs.visualization.points as vp
 import libs.common.img_proc as lip
+
 from libs.common.utils import make_dir
 from libs.common.img_proc import get_affine_transform
 
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
+import torchvision.transforms as transforms
 import cv2
 import csv
-
-import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
 import copy
 
 from PIL import Image
@@ -27,15 +28,17 @@ from os.path import sep as osep
 from os.path import exists
 from os import listdir 
 
-# maximum number of inputs to the network depending on your GPU memory
+# maximum number of instances to the network depending on your GPU memory
 MAX_INS_CNT = 140
 #MAX_INS_CNT = 64
+
 TYPE_ID_CONVERSION = {
     'Car': 0,
     'Cyclist': 1,
     'Pedestrian': 2,
 }
 
+# annotation style of KITTI dataset
 FIELDNAMES = ['type', 
               'truncated', 
               'occluded', 
@@ -94,7 +97,9 @@ cr_indices_dict = {
     }
 
 def get_cr_indices():
-    # helper function to define the indices used in computing the cross-ratio
+    """
+    Helper function to define the indices used in computing the cross-ratio.
+    """
     num_base_pts = 9
     num_lines = 12
     parents, children = interp_dict['bbox12']
@@ -259,8 +264,9 @@ class KITTI(bc.SupervisedDataset):
         return
     
     def _save_cropped_instances(self):
-        # DEPRECATED
-        """ crop and save car instance images with given 2d key-points
+        # DEPRECATED, will be removed in a future release
+        """ 
+        Crop and save car instance images with given 2d key-points
         """        
         assert hasattr(self, 'keypoints')
         all_save_paths = []
