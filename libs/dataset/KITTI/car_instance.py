@@ -119,7 +119,10 @@ def get_cr_indices():
     return cr_indices
 
 class KITTI(bc.SupervisedDataset):
-    def __init__(self, cfgs, split, logger, scale=1.0, use_stereo=False):
+    """
+    KITTI dataset.
+    """    
+    def __init__(self, cfgs, split, logger, scale=1.0):
         super().__init__(cfgs, split, logger)
         self.logger = logger
         self.logger.info("Initializing KITTI {:s} set, please wait...".format(split))
@@ -130,11 +133,10 @@ class KITTI(bc.SupervisedDataset):
         self._set_paths() # initialize paths
         self._inference_mode = False 
         self.car_sizes = [] # dimension of cars
-        if use_stereo:
-            raise NotImplementedError
         self._load_image_list()
         if self.split in ['train', 'valid', 'trainvalid'] and \
             self.exp_type in ['instanceto2d', 'baselinealpha', 'baselinetheta']:
+            # prepare local coordinates used in certain types of experiments
             self._prepare_key_points(cfgs)
             # save cropped car instances for debugging
             # cropped_path = pjoin(self._data_config['cropped_dir'], self.kpts_style,
@@ -145,11 +147,11 @@ class KITTI(bc.SupervisedDataset):
         self.generate_pairs()
         # self.visualize()
         if self.split in ['train', 'trainvalid'] and self.exp_type in ['2dto3d']:
-            # 2dto3d means the data is used a the sub-network that predicts 3D 
+            # 2dto3d means the data is used by the lifter that predicts 3D 
             # cuboid based on 2D screen coordinates 
-            self.normalize() # normalization for 2d-to-3d pose estimation
-        # use unlabeled images for weak self-supervision
+            self.normalize() # data normalization used for the lifter network
         if 'ss' in cfgs and cfgs['ss']['flag']:
+            # use unlabeled images for weak self-supervision
             self.use_ss = True
             self.ss_settings = cfgs['ss']
             self._initialize_unlabeled_data(cfgs)
@@ -196,7 +198,7 @@ class KITTI(bc.SupervisedDataset):
     
     def _check_precomputed_file(self, path, name):
         """
-        Check if a pre-computed numpy file exist or not.
+        Check if a pre-computed numpy file exists or not.
         """
         if exists(path):
             self.logger.info('Found prepared {0:s} at {1:s}'.format(name, path))
@@ -217,7 +219,9 @@ class KITTI(bc.SupervisedDataset):
         return
     
     def _prepare_key_points_custom(self, style, interp_params, vis_thresh=0.25):
-        # Define the 2d key-points as the projected 3D points on the image plane.
+        """
+        Project 3D bounding boxes to image planes to prepare screen coordinates.
+        """        
         assert 'keypoint_dir' in self._data_config
         kpt_dir = self._data_config['keypoint_dir']
         if interp_params['flag']:
@@ -295,6 +299,9 @@ class KITTI(bc.SupervisedDataset):
         return
     
     def _prepare_2d_pose_annot(self, threshold=4):
+        """ 
+        Prepare annotation for training the coordinate regression model.
+        """          
         all_paths = []
         all_boxes = []
         all_rotations = []
@@ -345,6 +352,9 @@ class KITTI(bc.SupervisedDataset):
                            add_gt=True,
                            filter_outlier=False
                            ):
+        """ 
+        Read ground truth 3D bounding box labels.
+        """           
         path_list = self._data_config['image_path_list'] 
         record_dict = {}
         for img_path in path_list:
@@ -379,6 +389,9 @@ class KITTI(bc.SupervisedDataset):
                          filter_outlier=False,
                          bbox_only=False
                          ):
+        """ 
+        Read labels and prepare annotation for a single image.
+        """  
         style = self._data_config['3d_kpt_sample_style']
         image_path = pjoin(self._data_config['image_dir'], image_name)
         if label_path is None:
@@ -537,12 +550,15 @@ class KITTI(bc.SupervisedDataset):
         return
     
     def project_3d_to_2d(self, points, K):
-        # get 2D projections 
+        """ 
+        Get 2D projection of 3D points in the camera coordinate system. 
+        """          
         projected = K @ points.T
         projected[:2, :] /= projected[2, :]
         return projected
     
     def render_car(self, ax, K, obj_class, rot_y, locs, dimension, shift):
+        # DEPRECATED
         cam_cord = []
         self.get_cam_cord(cam_cord, shift, rot_y, dimension, locs)
         # get 2D projections 
@@ -568,8 +584,9 @@ class KITTI(bc.SupervisedDataset):
             mean_size = all_sizes.mean(axis=0)
             std_size = all_sizes.std(axis=0)
             self.instance_statistics['size'] = {'mean':mean_size,
-                                                'std': std_size}
-            # prepare a reference 3D bounding box for inference purpose
+                                                'std': std_size
+                                                }
+            # prepare a reference 3D bounding box
             xmax, xmin = mean_size[0], -mean_size[0]
             ymax, ymin = mean_size[1], -mean_size[1]
             zmax, zmin = mean_size[2], -mean_size[2]
@@ -597,12 +614,14 @@ class KITTI(bc.SupervisedDataset):
                             std_trans = np.array([0.2, 0.01, 0.2]),
                             ):
         """
+        Data augmentation used for training the lifter sub-model.
+        
         std_rot: standard deviation of rotation around x, y and z axis
         std_trans: standard deviation of translation along x, y and z axis
         """
         aug_ids, aug_pose_vecs = [], []
         aug_ids.append((obj_class, dimension))
-        # KITTI only annotates rotation around y-axis
+        # KITTI only annotates rotation around y-axis (yaw)
         pose_vec = np.concatenate([locs, np.array([0., rot_y, 0.])]).reshape(1, 6)
         aug_pose_vecs.append(pose_vec)
         if not augment:
@@ -620,8 +639,10 @@ class KITTI(bc.SupervisedDataset):
         return aug_ids, aug_pose_vecs
     
     def get_representation(self, p2d, p3d, in_rep, out_rep):
-        # get input-output representations based on 3d point cloud and its 
-        # 2d projection
+        """
+        Get input-output representations based on 3d point cloud and its 
+        projected 2D screen coordinates.
+        """        
         # input representation
         if len(p2d) > 0:
             num_kpts = len(p2d[0])
@@ -661,7 +682,7 @@ class KITTI(bc.SupervisedDataset):
     
     def get_input_output_size(self):
         """
-        get the input-output size for 2d-to-3d lifting
+        Get the input/output size for 2d-to-3d lifting.
         """
         num_joints = self.num_joints
         if self._data_config['lft_in_rep'] == 'coordinates2d':
@@ -683,7 +704,9 @@ class KITTI(bc.SupervisedDataset):
                     dimension=None, 
                     strings=['l','h','w']
                     ):
-        # interpolate 3d points on a 3D bounding box with specified style
+        """
+        Interpolate 3d points on a 3D bounding box with a specified style.
+        """
         if dimension is not None:
             # size-encoded representation
             l = dimension[0]
@@ -700,8 +723,9 @@ class KITTI(bc.SupervisedDataset):
         return np.hstack([bbox_3d, np.hstack(new_joints)])
     
     def construct_box_3d(self, l, h, w, interp_params):
-        # add radom noise to length
-        # l *= (1 + np.random.randn()*0.1)
+        """
+        Construct 3D bounding box corners in the canonical pose.
+        """        
         x_corners = [0.5*l, l, l, l, l, 0, 0, 0, 0]
         y_corners = [0.5*h, 0, h, 0, h, 0, h, 0, h]
         z_corners = [0.5*w, w, w, 0, 0, w, w, 0, 0]
@@ -718,6 +742,9 @@ class KITTI(bc.SupervisedDataset):
         return corners_3d
     
     def get_cam_cord(self, cam_cord, shift, ids, pose_vecs, rot_xz=False):
+        """
+        Construct 3D bounding box corners in the camera coordinate system.
+        """         
         # does not augment the dimension for now
         dims = ids[0][1]
         l, h, w = dims[0], dims[1], dims[2]
@@ -728,14 +755,12 @@ class KITTI(bc.SupervisedDataset):
             rots = pose_vec[0, 3:]
             x, y, z = locs[0], locs[1], locs[2] # bottom center of the labeled 3D box
             rx, ry, rz = rots[0], rots[1], rots[2]
-            # TEMPORAL TESTING: rotation and translation augmentation
             # This purturbation turns out to work well for rotation estimation
 #            x *= (1 + np.random.randn()*0.1)
 #            y *= (1 + np.random.randn()*0.05)
 #            z *= (1 + np.random.randn()*0.1)
             if self.split == 'train' and self.exp_type == '2dto3d' and not self._inference_mode:
                 ry += np.random.randn()*np.pi # random perturbation
-            # END TEMPORAL TESTING
             rot_maty = np.array([[np.cos(ry), 0, np.sin(ry)],
                                 [0, 1, 0],
                                 [-np.sin(ry), 0, np.cos(ry)]])
@@ -762,8 +787,10 @@ class KITTI(bc.SupervisedDataset):
     def csv_read_annot(self, file_path, fieldnames):
         """
         Read instance attributes in the KITTI format. Instances not in the 
-        selected class will be ignored. A list of python dictionary is returned
-        where each dictionary represents one instsance.
+        selected class will be ignored. 
+        
+        A list of python dictionary is returned where each dictionary 
+        represents one instsance.
         """        
         annotations = []
         with open(file_path, 'r') as csv_file:
@@ -800,7 +827,6 @@ class KITTI(bc.SupervisedDataset):
         """
         Read camera projection matrix in the KITTI format.
         """  
-        # get camera intrinsic matrix K
         with open(file_path, 'r') as csv_file:
             reader = csv.reader(csv_file, delimiter=' ')
             for line, row in enumerate(reader):
@@ -811,16 +837,20 @@ class KITTI(bc.SupervisedDataset):
                     break        
         return P
     
-    def load_annotations(self, label_path, calib_path, fieldnames=FIELDNAMES):        
+    def load_annotations(self, label_path, calib_path, fieldnames=FIELDNAMES): 
+        """
+        Read 3D annotation and camera parameters.
+        """          
         if self.split in ['train', 'valid', 'trainvalid', 'test']:
             annotations = self.csv_read_annot(label_path, fieldnames)
-
         # get camera intrinsic matrix K
         P = self.csv_read_calib(calib_path)
-
         return annotations, P
     
     def add_visibility(self, joints, img_width=1242, img_height=375):
+        """
+        Compute binary visibility of projected 2D parts.
+        """  
         assert joints.shape[1] == 2
         visibility = np.ones((len(joints), 1))
         # predicate from upper left corner
@@ -833,6 +863,9 @@ class KITTI(bc.SupervisedDataset):
         return np.hstack([joints, visibility])
     
     def get_inlier_indices(self, p_2d, threshold=0.3):
+        """
+        Get indices of instances that are visible 'enough'.
+        """  
         indices = []
         num_joints = p_2d[0].shape[0]
         for idx, kpts in enumerate(p_2d):
@@ -841,6 +874,9 @@ class KITTI(bc.SupervisedDataset):
         return indices
     
     def filter_outlier(self, p_2d, p_3d, threshold=0.3):
+        """
+        Keep instances that are visible 'enough'.
+        """  
         p_2d_filtered, p_3d_filtered, indices = [], [], []
         num_joints = p_2d[0].shape[0]
         for idx, kpts in enumerate(p_2d):
@@ -874,6 +910,10 @@ class KITTI(bc.SupervisedDataset):
                        filter_outlier=True,
                        fieldnames=FIELDNAMES
                        ):
+        """
+        Get (input, output) pair used for training a lifter sub-model from a 
+        single image.
+        """
         image_name = image_path.split(osep)[-1]
         if label_path is None:
             # default is ground truth annotation
@@ -889,7 +929,7 @@ class KITTI(bc.SupervisedDataset):
         #               [  0.    , 707.0493, 180.5066],
         #               [  0.    ,   0.    ,   1.    ]], dtype=np.float32)
         shift = np.linalg.inv(K) @ P[:, 3].reshape(3,1)      
-        # P containes intrinsics and extrinsics, we factorize P to K[I|K^-1t] 
+        # P containes intrinsics and extrinsics, I factorize P to K[I|K^-1t] 
         # and use extrinsics to compute the camera coordinate
         # here the extrinsics represent the shift between current camera to
         # the reference grayscale camera        
@@ -964,9 +1004,14 @@ class KITTI(bc.SupervisedDataset):
             ret = ret + (rotations, )
         return ret            
     
-    def show_annot(self, image_path, label_file=None, calib_file=None, save_dir=None):
+    def show_annot(self, 
+                   image_path, 
+                   label_file=None, 
+                   calib_file=None, 
+                   save_dir=None
+                   ):
         """
-        Show the annotations of an image.
+        Show the annotation of an image.
         """      
         image_name = image_path.split(osep)[-1]
         if label_file is None:
@@ -1076,7 +1121,9 @@ class KITTI(bc.SupervisedDataset):
         return
     
     def visualize(self, plot_num = 1, save_dir=None):
-        # show some random images with annotations
+        """
+        Show some random images with annotations.
+        """        
         path_list = self._data_config['image_path_list']
         chosen = np.random.choice(len(path_list), plot_num, replace=False)
         for img_idx in chosen:
@@ -1091,6 +1138,9 @@ class KITTI(bc.SupervisedDataset):
         self._read_img_during_inference = flags[1]
     
     def extract_ss_sample(self, cnt):
+        """
+        Prepare data for self-supervised representation learning.
+        """           
         # cnt: number of fully supervised samples
         extract_cnt = self.ss_settings['max_per_img'] - cnt
         if extract_cnt <= 0:
@@ -1114,6 +1164,9 @@ class KITTI(bc.SupervisedDataset):
         return image, target, weights, meta
     
     def prepare_ft_dict(self, idx):
+        """
+        Prepare data for fine-tuning.
+        """  
         img_name = self.annoted_img_paths[idx]
         img_annot = self.annot_dict[img_name]
         ret = {}
@@ -1157,13 +1210,15 @@ class KITTI(bc.SupervisedDataset):
         return ret
     
     def __getitem__(self, idx):
+        """
+        Required by dataloader.
+        """  
         # only return testing images during inference
         if self.split == 'test' or self._inference_mode:
             #TODO: consider classes except for cars in the future
             img_name = self.annoted_img_paths[idx]
             # debug: use a specified image for visualization
             # img_name = "006658.png"
-            # end debug
             img_path = pjoin(self._data_config['image_dir'], img_name)
             if self._read_img_during_inference:
                 image = lip.imread_rgb(img_path)
@@ -1257,6 +1312,9 @@ class KITTI(bc.SupervisedDataset):
             raise NotImplementedError
 
 def prepare_data(cfgs, logger):
+    """
+    Prepare training and validation dataset objects.
+    """  
     train_set = KITTI(cfgs, 'train', logger)
     valid_set = KITTI(cfgs, 'valid', logger)
     if cfgs['exp_type'] == '2dto3d':
