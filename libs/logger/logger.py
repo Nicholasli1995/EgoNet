@@ -1,5 +1,6 @@
 """
 Basic logging functions.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
@@ -7,6 +8,7 @@ Contact: nicholas.li@connect.ust.hk
 import logging
 import os
 import time
+
 from libs.common import utils
 
 initialized = False
