@@ -17,3 +17,9 @@ Finally, go to ${EgoNet_DIR}/tools and run
 ```
 
 You can set --batch_to_show to other integers to see more results.
+
+The visualized 3D bounding boxes are distinguished by their colors: 
+1. Black indicates ground truth 3D boxes.
+2. Magenta indicates 3D bounding boxes predicted by another 3D object detector ([D4LCN](https://github.com/dingmyu/D4LCN)).
+3. Red indicates the predictions of Ego-Net, using the 2D bounding boxes from [D4LCN](https://github.com/dingmyu/D4LCN).
+4. Yellow indicates the predictions of Ego-Net, using the ground truth 2D bounding boxes.
