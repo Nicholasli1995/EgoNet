@@ -1,5 +1,5 @@
 """
-Visualization utilities for 2D and 3D points based on Matplotlib.
+Simple visualization utilities for 2D and 3D points based on Matplotlib.
 
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
@@ -7,9 +7,13 @@ Contact: nicholas.li@connect.ust.hk
 
 import numpy as np
 import matplotlib.pyplot as plt
+
 from mpl_toolkits.mplot3d import Axes3D
 
 def check_points(points, dimension):
+    """
+    Assertion function for input dimension.
+    """
     if len(points.shape) == 1:
         assert points.shape[0] % dimension == 0
         points = points.reshape(-1, dimension)
@@ -20,9 +24,11 @@ def check_points(points, dimension):
     return points
 
 def set_3d_axe_limits(ax, points=None, center=None, radius=None, ratio=1.2):
-    # set 3d axe limits to simulate set_aspect('equal')
-    # matplotlib has not yet provided implementation of set_aspect('equal') 
-    # for 3d axe
+    """
+    Set 3d axe limits to simulate set_aspect('equal').
+    Matplotlib has not yet provided implementation of set_aspect('equal') 
+    for 3d axe.
+    """
     if points is None:
         assert center is not None and radius is not None
     if center is None or radius is None:
@@ -53,10 +59,13 @@ def plot_3d_points(ax,
                    alpha=1, 
                    set_limits=False
                    ):
-    # points of shape [3*N_points] or [N_points, 3]
+    """
+    Scatter plot of 3D points.
+    
+    points are of shape [3*N_points] or [N_points, 3]
+    """
     points = check_points(points, dimension=3)
     points = points[indices,:] if indices is not None else points
-    # plot in a cube region
     ax.scatter(points[:,0], points[:,1], points[:,2], marker=marker, c=color,
                s=size, alpha=alpha)
     if set_limits:
@@ -94,7 +103,11 @@ def plot_lines(ax,
                alpha=0.8, 
                add_index=False
                ):
-    # connections of shape [n_lines, 2]
+    """
+    Plot 2D/3D lines given points and connection.
+    
+    connections are of shape [n_lines, 2]
+    """
     points = check_points(points, dimension)
     if add_index:
         for idx in range(len(points)):
@@ -117,8 +130,12 @@ def plot_lines(ax,
     return line
 
 def plot_mesh(ax, vertices, faces, color='grey'):
-    # vertics of shape [N_vertices, 3]
-    # faces pf shape [N_faces, 3] storing indices
+    """
+    Simple mesh plotting.
+    
+    vertics of shape [N_vertices, 3]
+    faces pf shape [N_faces, 3] storing indices
+    """    
     set_3d_axe_limits(ax, vertices)
     ax.plot_trisurf(vertices[:, 0], 
                     vertices[:, 1], 
@@ -135,10 +152,13 @@ def plot_3d_coordinate_system(ax,
                               length=300, 
                               colors=['r', 'g', 'b']
                               ):
-    # draw a coordinate system at a specified origin
+    """
+    Draw a coordinate system at a specified origin
+    
+    system: [v1, v2, v3] 
+    """ 
     origin = origin.reshape(3, 1)
     start_points = np.repeat(origin, 3, axis=1)
-    # system: [v1, v2, v3] 
     end_points = start_points + system*length
     all_points = np.hstack([origin, end_points])
     for i in range(3):
@@ -156,6 +176,9 @@ def plot_3d_bbox(ax,
                  linestyle='-', 
                  add_index=False
                  ):
+    """
+    Draw the projected edges of a 3D cuboid.
+    """ 
     c = np.random.rand(3) if color is None else color
     plot_lines(ax, 
                bbox_3d_projected, 
@@ -174,7 +197,11 @@ def plot_2d_bbox(ax,
                  label=None, 
                  linestyle='-'
                  ):
-    # bbox_2d in the format [x1, y1, x2, y2]
+    """
+    Draw a 2D bounding box.
+    
+    bbox_2d in the format [x1, y1, x2, y2]
+    """ 
     c = np.random.rand(3) if color is None else color
     x1, y1, x2, y2 = bbox_2d[0], bbox_2d[1], bbox_2d[2], bbox_2d[3],
     points = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
@@ -185,6 +212,7 @@ def plot_2d_bbox(ax,
     return
 
 def plot_comparison_relative(points_pred, points_gt):
+    # DEPRECATED
     # plot the comparison of the shape relative to the root point
     plt.figure()
     num_row = 3
@@ -214,8 +242,9 @@ def plot_comparison_relative(points_pred, points_gt):
     return
 
 def plot_scene_3dbox(points_pred, points_gt=None, ax=None, color='r'):
-    # plot the comparison in a 3d scene composed of 3d bounding boxes
-    # assert points_pred.shape[1] == 9
+    """
+    Plot the comparison of predicted 3d bounding boxes and ground truth ones.
+    """ 
     if ax is None:
         plt.figure()
         ax = plt.subplot(111, projection='3d')
@@ -231,7 +260,6 @@ def plot_scene_3dbox(points_pred, points_gt=None, ax=None, color='r'):
     for pred in preds:
         plot_3d_points(ax, pred, color=color, size=15)
         plot_lines(ax, pred[1:,], plot_3d_bbox.connections, dimension=3, c=color)
-        
     if points_gt is not None:
         for gt in gts:
             plot_3d_points(ax, gt, color='k', size=15)
@@ -240,6 +268,7 @@ def plot_scene_3dbox(points_pred, points_gt=None, ax=None, color='r'):
     return ax
 
 def get_area(points, indices, preserve_points=False):
+    # DEPRECATED
     # points [N, 2]
     # indices [M, 3]
     vec1 = points[indices[:, 1], :] - points[indices[:, 0], :]
@@ -253,6 +282,7 @@ def get_area(points, indices, preserve_points=False):
     return feature
 
 def interpolate(start, end, num_interp):
+    # DEPRECATED
     # start: [3]
     # end: [3]
     x = np.linspace(start[0], end[0], num=num_interp+2)[1:-1].reshape(num_interp, 1)
@@ -261,6 +291,7 @@ def interpolate(start, end, num_interp):
     return np.concatenate([x,y,z], axis=1)
 
 def get_interpolated_points(points, indices, num_interp):
+    # DEPRECATED
     # points [N, 3]
     # indices [M, 2] point indices for interpolating a line segment
     # num_interp how many points to add for each segment
@@ -288,7 +319,9 @@ def draw_pose_vecs(ax, pose_vecs=None, color='black'):
                 )
         
 def get_bbox_3d(points, add_center=False, interp_style=""):
-    # get a 3D bounding boxes from coordinate limits in object coordinate system
+    """
+    Get a 3D bounding boxes from coordinate limits in object coordinate system.
+    """  
     assert len(points.shape) == 2 
     if points.shape[0] == 3:
         axis=1 
@@ -328,7 +361,75 @@ def get_bbox_3d(points, add_center=False, interp_style=""):
         bbox = np.vstack([bbox, new_points])
     return bbox
 
-## static variables  
+def ray_intersect_triangle(p0, p1, triangle):
+    """
+    Tests if a ray starting at point p0, in the direction
+    p1 - p0, will intersect with the triangle.
+    
+    arguments:
+    p0, p1: numpy.ndarray, both with shape (3,) for x, y, z.
+    triangle: numpy.ndarray, shaped (3,3), with each row
+        representing a vertex and three columns for x, y, z.
+    
+    returns: 
+        0.0 if ray does not intersect triangle, 
+        1.0 if it will intersect the triangle,
+        2.0 if starting point lies in the triangle.
+        
+    Reference: https://www.erikrotteveel.com/python/three-dimensional-ray-tracing-in-python/
+    """
+    v0, v1, v2 = triangle
+    u = v1 - v0
+    v = v2 - v0
+    normal = np.cross(u, v)
+    b = np.inner(normal, p1 - p0)
+    a = np.inner(normal, v0 - p0)
+    if (b == 0.0):
+        # ray is parallel to the plane
+        if a != 0.0:
+            # ray is outside but parallel to the plane
+            return 0
+        else:
+            # ray is parallel and lies in the plane
+            rI = 0.0
+    else:
+        rI = a / b
+    if rI < 0.0:
+        return 0
+    w = p0 + rI * (p1 - p0) - v0
+    denom = np.inner(u, v) * np.inner(u, v) - \
+        np.inner(u, u) * np.inner(v, v)
+    si = (np.inner(u, v) * np.inner(w, v) - \
+        np.inner(v, v) * np.inner(w, u)) / denom
+    if (si < 0.0) | (si > 1.0):
+        return 0
+    ti = (np.inner(u, v) * np.inner(w, u) - \
+        np.inner(u, u) * np.inner(w, v)) / denom
+    if (ti < 0.0) | (si + ti > 1.0):
+        return 0
+    if (rI == 0.0):
+        return 2
+    return 1
+
+def get_visibility(box3d, triangles):
+    """
+    Get visibility for each vertex of a 3D bounding box given all the triangles
+    in a scene.
+    
+    box3d: [8, 3] The vertex coordinates in the camera coordinate system.
+    triangles: [N, 3, 3]
+    """      
+    visibility = np.ones(8, dtype=np.bool)
+    p1 = np.zeros(3)
+    for idx, p0 in enumerate(box3d):
+        intersects = set()
+        for triangle in triangles:
+            intersects.add(ray_intersect_triangle(p0, p1, triangle))
+        if 1 in intersects:
+            visibility[idx] = False
+    return visibility
+
+## static variables implemented as function attributes 
 plot_3d_coordinate_system.connections = np.array([[0, 1],
                                                   [0, 2],
                                                   [0, 3]])
