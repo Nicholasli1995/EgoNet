@@ -7,7 +7,7 @@
 - overlap on ground-plane (AP)
 - overlap in 3D (AP)
 
-Compile `evaluate_object_3d_offline.cpp` with dependency of Boost and Linux `dirent.h` (You should already have it under most Linux).
+Compile `evaluate_object_3d_offline.cpp` (or `evaluate_object_3d_offline_r40.cpp` for the updated metric) with dependency of Boost and Linux `dirent.h` (You should already have it under most Linux).
 
 Run the evalutaion by:
 
