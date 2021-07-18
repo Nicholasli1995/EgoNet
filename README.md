@@ -22,7 +22,7 @@ Check instructions [here](https://github.com/Nicholasli1995/EgoNet/blob/master/d
 </p>
 
 ## Performance: AP<sup>BEV</sup>@R<sub>40</sub> on KITTI val set for Car (monocular RGB)
-
+The validation results in the paper was based on R<sub>11</sub>, the results using R<sub>40</sub> are attached here.
 | Method                    | Reference|Easy|Moderate|Hard|
 | ------------------------- | ---------------| --------------| --------------| --------------| 
 |[M3D-RPN](https://arxiv.org/abs/1907.06038)|ICCV 2019|20.85| 15.62| 11.88|
@@ -32,7 +32,8 @@ Check instructions [here](https://github.com/Nicholasli1995/EgoNet/blob/master/d
 |[Kinematic3D](https://arxiv.org/abs/2007.09548)|ECCV 2020|27.83| 19.72| 15.10|
 |[GrooMeD-NMS](https://github.com/abhi1kumar/groomed_nms)|CVPR 2021 |27.38|19.75|15.92|
 |[MonoDLE](https://github.com/xinzhuma/monodle)|CVPR 2021|24.97| 19.33| 17.01|
-|Ours           |CVPR 2021 |**33.60**|**25.38**|**22.80**|
+|Ours (@R<sub>11</sub>)           |CVPR 2021 |**33.60**|**25.38**|**22.80**|
+|Ours (@R<sub>40</sub>)           |CVPR 2021 |**34.31**|**24.80**|**20.16**|
 
 ## Performance: AOS@R<sub>40</sub> on KITTI test set for Car (RGB)
 
