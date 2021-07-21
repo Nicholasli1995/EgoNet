@@ -8,11 +8,11 @@ Contact: nicholas.li@connect.ust.hk
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 import numpy as np
+from scipy.spatial import distance_matrix
 
 from libs.common.img_proc import soft_arg_max, appro_cr
-from scipy.spatial import distance_matrix
+
 
 loss_dict = {'mse': nn.MSELoss(reduction='mean'),
              'sl1': nn.SmoothL1Loss(reduction='mean'),
@@ -45,7 +45,9 @@ class JointsMSELoss(nn.Module):
 
         return loss / num_joints
 
-def get_comp_dict(spec_list = ['None', 'None', 'None'], loss_weights = [1,1,1]):
+def get_comp_dict(spec_list = ['None', 'None', 'None'], 
+                  loss_weights = [1,1,1]
+                  ):
     comp_dict = {}
 
     if spec_list[0] != 'None':
@@ -57,7 +59,10 @@ def get_comp_dict(spec_list = ['None', 'None', 'None'], loss_weights = [1,1,1]):
     return comp_dict
 
 class JointsCompositeLoss(nn.Module):
-    # loss function for 2d keypoint localization consisting of multiple terms
+    """
+    Loss function for 2d screen coordinate regression which consists of 
+    multiple terms.
+    """
     def __init__(self,
                  spec_list,
                  img_size,
@@ -68,14 +73,15 @@ class JointsCompositeLoss(nn.Module):
                  use_target_weight=False
                  ):
         """
-        comp_dict specify the optional terms used in the loss computation
-        hm: a supervised loss defined with a dense heatmap target
-        coor: a supervised loss defined with sparse 2D coordinates
-        cr: a self-supervised loss defined with prior cross-ratio
-        cl: a self-supervised loss defined with colinear field
+        comp_dict specify the optional terms used in the loss computation, 
+        which is specified with spec_list.
         loss for each component follows the format of [loss_type, weight],
-        comp_type speficy the loss type for each component (e.g. L1 or L2) while
-        weight gives the weight for this component
+        loss_type speficy the loss type for each component (e.g. L1 or L2) while
+        weight gives the weight for this component.
+        
+        hm: a supervised loss defined with a heatmap target
+        coor: a supervised loss defined with 2D coordinates
+        cr: a self-supervised loss defined with prior cross-ratio
         """
         super(JointsCompositeLoss, self).__init__()
         self.comp_dict = get_comp_dict(spec_list, loss_weights)
@@ -87,22 +93,32 @@ class JointsCompositeLoss(nn.Module):
         self.cr_loss_thres = cr_loss_thres
 
     def calc_hm_loss(self, output, target):
-        # output: predicted heatmaps of shape [N, K, H, W]
-        # target: target heatmaps of shape [N, K, H, W]
+        """
+        Heatmap loss which corresponds to L_{hm} in the paper.
+        
+        output: predicted heatmaps of shape [N, K, H, W]
+        target: ground truth heatmaps of shape [N, K, H, W]
+        """        
         batch_size = output.size(0)
-        num_joints = output.size(1)
-        heatmaps_pred = output.reshape((batch_size, num_joints, -1)).split(1, 1)
-        heatmaps_gt = target.reshape((batch_size, num_joints, -1)).split(1, 1)
+        num_parts = output.size(1)
+        heatmaps_pred = output.reshape((batch_size, num_parts, -1)).split(1, 1)
+        heatmaps_gt = target.reshape((batch_size, num_parts, -1)).split(1, 1)
         loss = 0
-        for idx in range(num_joints):
+        for idx in range(num_parts):
             heatmap_pred = heatmaps_pred[idx].squeeze()
             heatmap_gt = heatmaps_gt[idx].squeeze()
             loss += 0.5 * self.comp_dict['hm'][0](heatmap_pred, heatmap_gt)        
-        return loss / num_joints
+        return loss / num_parts
     
     def calc_cross_ratio_loss(self, pred_coor, target_cr, mask):
+        """
+        Cross-ratio loss which corresponds to L_{cr} in the paper.
+        
+        pred_coor: predicted local coordinates
+        target_cr: ground truth cross ratio
+        """  
         assert hasattr(self, 'cr_indices')
-        # the indices is assumed to be initialized by the user
+        # this indices is assumed to be initialized by the user
         loss = 0
         mask = mask.to(pred_coor.device)
         if mask.sum() == 0:
@@ -119,13 +135,17 @@ class JointsCompositeLoss(nn.Module):
                 loss += line_loss * mask[sample_idx][line_idx][0]
         return loss/mask.sum()
     
-    def get_cr_mask(self, coordinates_gt, threshold = 0.15):
+    def get_cr_mask(self, coordinates, threshold = 0.15):
+        """
+        Mask some edges out when computing the cross-ratio loss.
+        Ignore the fore-shortened edges since they will produce large and 
+        unstable gradient.
+        """          
         assert hasattr(self, 'cr_indices')
-        # ignore the fore-shortened edges since they will produce large and unstable gradient
-        mask = torch.zeros(coordinates_gt.shape[0], len(self.cr_indices), 1)
-        for sample_idx in range(len(coordinates_gt)):
+        mask = torch.zeros(coordinates.shape[0], len(self.cr_indices), 1)
+        for sample_idx in range(len(coordinates)):
             for line_idx in range(len(self.cr_indices)):
-                pts = coordinates_gt[sample_idx][self.cr_indices[line_idx]]
+                pts = coordinates[sample_idx][self.cr_indices[line_idx]]
                 dm = distance_matrix(pts, pts)
                 minval = np.min(dm[np.nonzero(dm)])
                 if minval > threshold:
@@ -133,20 +153,27 @@ class JointsCompositeLoss(nn.Module):
         return mask
     
     def calc_colinear_loss(self):
+        # DEPRECATED
         return 0.
     
     def calc_coor_loss(self, coordinates_pred, coordinates_gt):
-        # output:[N, K, H, W]
-        # target: [N, K, 2]
+        """
+        Coordinate loss which corresponds to L_{2d} in the paper.
+        coordinates_pred: [N, K, 2]
+        coordinates_gt: [N, K, 2]
+        """  
         coordinates_gt[:, :, 0] /= self.img_size[1]
         coordinates_gt[:, :, 1] /= self.img_size[0]   
         loss = self.comp_dict['coor'][0](coordinates_pred, coordinates_gt) 
         return loss
     
     def forward(self, output, target, target_weight=None, meta=None):
-        # output is in the format of (heatmaps, coordinates) where coordinates
-        # is optional
-        # target refers to the ground truth heatmaps
+        """
+        Loss evaluation.
+        Output is in the format of (heatmaps, coordinates) where coordinates
+        is optional.
+        target refers to the ground truth heatmaps.
+        """  
         if type(output) is tuple:
             heatmaps_pred, coordinates_pred = output
         else:
@@ -175,6 +202,9 @@ class JointsCompositeLoss(nn.Module):
         return total_loss
     
 class MSELoss1D(nn.Module):
+    """
+    Mean squared error loss.
+    """     
     def __init__(self, use_target_weight=False, reduction='mean'):
         super(MSELoss1D, self).__init__()
         self.criterion = nn.MSELoss(reduction=reduction)
@@ -185,6 +215,9 @@ class MSELoss1D(nn.Module):
         return loss
     
 class SmoothL1Loss1D(nn.Module):
+    """
+    Smooth L1 loss.
+    """
     def __init__(self, use_target_weight=False):
         super(SmoothL1Loss1D, self).__init__()
         self.criterion = nn.SmoothL1Loss(reduction='mean')
@@ -195,7 +228,7 @@ class SmoothL1Loss1D(nn.Module):
         return loss
 
 class DecoupledSL1Loss(nn.Module):
-    # temporary code, use a larger weight for the center
+    # DEPRECATED
     def __init__(self, use_target_weight=None):
         super(DecoupledSL1Loss, self).__init__()
         self.criterion = F.smooth_l1_loss
@@ -207,6 +240,7 @@ class DecoupledSL1Loss(nn.Module):
         return loss_center + loss_else
     
 class JointsOHKMMSELoss(nn.Module):
+    # DEPRECATED
     def __init__(self, use_target_weight, topk=8):
         super(JointsOHKMMSELoss, self).__init__()
         self.criterion = nn.MSELoss(reduction='none')
@@ -251,6 +285,7 @@ class JointsOHKMMSELoss(nn.Module):
         return self.ohkm(loss)
 
 class WingLoss(nn.Module):
+    # DEPRECATED
     def __init__(self, use_target_weight, width=5, curvature=0.5, image_size=(384, 288)):
         super(WingLoss, self).__init__()
         self.width = width

@@ -18,9 +18,10 @@ PCK_THRES = np.array([0.1, 0.2, 0.3])
 def get_distance(gt, pred):
     """
     2D Euclidean distance of two groups of points with visibility considered. 
+    
+    gt: [n_joints, 2 or 3]
+    pred: [n_joints, 2]
     """    
-    # gt: [n_joints, 2 or 3]
-    # pred: [n_joints, 2]
     if gt.shape[1] == 2:
         sqerr = (gt - pred)**2
         sqerr = sqerr.sum(axis = 1)
@@ -36,6 +37,9 @@ def get_distance(gt, pred):
     return dist_list
 
 def get_angle_error(pred, meta_data, cfgs=None):
+    """
+    Compute error for angle prediction.
+    """    
     if not isinstance(pred, np.ndarray):
         pred = pred.data.cpu().numpy()    
     angles_pred = np.arctan2(pred[:,1], pred[:,0])
@@ -50,7 +54,9 @@ def get_angle_error(pred, meta_data, cfgs=None):
     return avg_acc, cnt, others
 
 def get_PCK(pred, gt):
-    # get percentage of correct key-points
+    """
+    Get percentage of correct key-points
+    """
     distance = np.array(get_distance(gt, pred))
     denominator = (gt[:, 1].max() - gt[:, 1].min()) * 1/3
     correct_cnt = np.zeros((len(PCK_THRES)))
