@@ -1,5 +1,6 @@
 """
-fully-connected model architecture for processing 1D data.
+Fully-connected model architecture for processing 1D data.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
@@ -55,7 +56,7 @@ class FCModel(nn.Module):
                  input_size=32,
                  output_size=64):
         """
-        dm: use distance matrix feature computed from coordinates
+        dm: use distance matrix feature computed from coordinates (DEPRECATED)
         leaky: use leaky ReLu instead of normal Relu
         """
         super(FCModel, self).__init__()

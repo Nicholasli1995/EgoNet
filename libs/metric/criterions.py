@@ -13,6 +13,7 @@ import numpy as np
 import torch
 from scipy.spatial.transform import Rotation
 
+# threshold for percentage of correct key-points (PCK)
 PCK_THRES = np.array([0.1, 0.2, 0.3])
 
 def get_distance(gt, pred):
@@ -71,11 +72,12 @@ def get_distance_src(output,
                      arg_max='hard'
                      ):
     """
-    From predicted heatmaps, obtain key point locations and transform them back
-    into the source images based on metadata. Error is then evaluated on the
-    source image.
+    From predicted heatmaps, obtain local coordinates (\phi_l in the paper) 
+    and transform them back to the source images based on metadata. 
+    Error is then evaluated on the source image for the screen coordinates 
+    (\phi_g in the paper).
     """
-    # report distance in terms of pixel in the original image
+    # the error is reported as distance in terms of pixels in the source image
     if type(output) is tuple:
         pred, max_vals = output[1].data.cpu().numpy(), None
     elif isinstance(output, np.ndarray) and arg_max == 'soft':
@@ -89,7 +91,6 @@ def get_distance_src(output,
     else:
         raise NotImplementedError
     image_size = image_size if cfgs is None else cfgs['heatmapModel']['input_size']
-    # TODO: check the target generation and coordinate mapping
     # multiply by down-sample ratio
     if not isinstance(pred, np.ndarray):
         pred = pred.data.cpu().numpy()
@@ -99,7 +100,7 @@ def get_distance_src(output,
     if type(output) is tuple:
         pred *= image_size[0]
     else:
-        pred *= image_size[0]/output.shape[3]
+        pred *= image_size[0] / output.shape[3]
     # inverse transform and compare pixel didstance
     centers, scales = meta_data['center'], meta_data['scale']
     # some predictions are generated for unlabeled data
@@ -120,27 +121,29 @@ def get_distance_src(output,
                                              scales[sample_idx], 
                                              rots[sample_idx], 
                                              image_size, 
-                                             inv=1)
+                                             inv=1
+                                             )
         joints_original = joints_original_batch[sample_idx]        
         pred_src_coordinates = lip.affine_transform_modified(pred_used[sample_idx], 
-                                                             trans_inv) 
+                                                             trans_inv
+                                                             ) 
         all_src_coordinates.append(pred_src_coordinates.reshape(1, len(pred_src_coordinates), 2))
         distance_list += get_distance(joints_original, pred_src_coordinates)
         correct_cnt_sum += get_PCK(pred_src_coordinates, joints_original)
     cnt = len(distance_list)
     avg_acc = sum(distance_list)/cnt
     others = {
-        'src_coord': np.concatenate(all_src_coordinates, axis=0),
-        'joints_pred': pred,
-        'max_vals': max_vals,
+        'src_coord': np.concatenate(all_src_coordinates, axis=0), # screen coordinates
+        'joints_pred': pred, # predicted local coordinates
+        'max_vals': max_vals, 
         'correct_cnt': correct_cnt_sum,
-        'PCK_batch': correct_cnt_sum/cnt
+        'PCK_batch': correct_cnt_sum / cnt
         }
     return avg_acc, cnt, others
 
 class AngleError():
     """
-    angle error in degrees. 
+    Angle error in degrees. 
     """  
     def __init__(self, cfgs, num_joints=None):
         self.name = 'Angle error in degrees'
@@ -168,7 +171,7 @@ class AngleError():
 
 class JointDistance2DSIP():
     """
-    joint distance in the source image plane (SIP). 
+    Joint distance error evaluated for screen coordinates in the source image plane (SIP). 
     """  
     def __init__(self, cfgs, num_joints=None):
         self.name = 'Joint distance in the source image plane'
@@ -185,23 +188,28 @@ class JointDistance2DSIP():
   
     def update(self, prediction, meta_data, ground_truth=None, logger=None):
         """
-        the prediction and transformation parameters in meta_data are used.
+        Update statistics for a batch.
+        The prediction and transformation parameters in meta_data are used.
         """    
         avg_acc, cnt, others = get_distance_src(prediction, 
                                                 meta_data,
                                                 arg_max=self.arg_max,
-                                                image_size=self.image_size)       
+                                                image_size=self.image_size
+                                                )       
         self.mean = (self.mean * self.count + cnt * avg_acc) / (self.count + cnt)
         self.count += cnt
         self.PCK_counts += others['correct_cnt']
         return 
     
     def report(self, logger):
+        """
+        Report final evaluation results.
+        """  
         logger.info("Ealuaton Results:")
         msg = 'Error type: {error_type:s}\t' \
-              'MPJPE: {MPJPE}\t'.format(
-                      error_type = self.name,
-                      MPJPE = self.mean)     
+              'MPJPE: {MPJPE}\t'.format(error_type = self.name, 
+                                        MPJPE = self.mean
+                                        )     
         logger.info(msg)        
         for idx, value in enumerate(self.PCK_counts):
             PCK = value / self.count
@@ -209,6 +217,9 @@ class JointDistance2DSIP():
         return
 
 def update_statistics(self, update, num_data, name_str):
+    """
+    Update error statistics for a data batch.
+    """ 
     old_count = getattr(self, 'count'+name_str)
     old_mean = getattr(self, 'mean'+name_str)
     old_max = getattr(self, 'max'+name_str)
@@ -229,9 +240,10 @@ def update_rotation_error(self,
                           meta_data=None, 
                           logger=None,
                           name_str='',
-                          style='euler'):
+                          style='euler'
+                          ):
     """
-    get rotation error between two point clouds 
+    Get rotation error between two 3D point clouds. 
     """    
     num_data = len(prediction)
     prediction = prediction.reshape(num_data, -1, 3)
@@ -260,7 +272,9 @@ def update_joints_3d_error(self,
                            name_str='',
                            style='direct'
                            ):
-    # squared error between prediction and expected output
+    """
+    Get distance error between prediction and ground truth.
+    """
     ground_truth = ground_truth.reshape(len(ground_truth), -1, 3)
     prediction = prediction.reshape(len(prediction), -1, 3)
     num_joints = prediction.shape[1]
@@ -283,6 +297,9 @@ def update_joints_3d_error(self,
     return    
 
 class RotationError3D():
+    """
+    Helper class for recording rotation estimation error.
+    """
     def __init__(self, cfgs):
         self.name = 'Rotation error'
         self.style = cfgs['metrics']['R3D']['style']
@@ -320,6 +337,9 @@ class RotationError3D():
         return
     
 class JointDistance3D():
+    """
+    Helper class for recording joint distance error.
+    """
     def __init__(self, cfgs):
         self.name = 'Joint distance'
         self.style = cfgs['metrics']['JD3D']['style']
@@ -514,6 +534,9 @@ class RTError3D():
         return
     
 class Evaluator():
+    """
+    Helper class for recording a list of pre-defined metrics.
+    """    
     def __init__(self, metrics, cfgs=None, num_joints=9):
         """
         metrics is a list of strings specifying what metrics to use

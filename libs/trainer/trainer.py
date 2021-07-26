@@ -1,5 +1,6 @@
 """
 Utilities for training and validation.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
@@ -483,6 +484,3 @@ def evaluate(eval_dataset,
         np.save(save_path, np.array(record))
     evaluator.report(logger)
     return
-
-
-        

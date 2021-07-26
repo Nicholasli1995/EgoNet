@@ -1,10 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Deprecated. Will be deleted in a future version.
 Pre-defined accuracy functions.
-Author: Shichao Li
-Contact: nicholas.li@connect.ust.hk
 """
 
 import libs.common.img_proc as lip
@@ -50,7 +46,6 @@ def accuracy_pixel(output,
     else:
         raise NotImplementedError
     image_size = image_size if cfgs is None else cfgs['heatmapModel']['input_size']
-    # TODO: check the target generation and coordinate mapping
     # multiply by down-sample ratio
     if not isinstance(pred, np.ndarray):
         pred = pred.data.cpu().numpy()
