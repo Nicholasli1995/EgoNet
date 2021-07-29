@@ -10,6 +10,7 @@ News:
 
 **Check our 5-min video ([Youtube](https://www.youtube.com/watch?v=isKo0F3MU68), [爱奇艺](https://www.iqiyi.com/v_y6lrdy33kg.html)) for an introduction.**
 
+**中文详解**：[哔哩哔哩](https://www.bilibili.com/video/BV1jP4y1t7ee)
 <p align="center">
   <img src="https://github.com/Nicholasli1995/EgoNet/blob/master/imgs/teaser.jpg"  width="830" height="200" />
 </p>
