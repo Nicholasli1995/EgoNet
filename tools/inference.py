@@ -160,25 +160,24 @@ def inference(testset, model, results, cfgs):
             # use detected bounding box from any 2D/3D detector
             thres = cfgs['conf_thres'] if 'conf_thres' in cfgs else 0.
             annot_dict = gather_dict(meta, results['pred'], thres=thres)
-            if len(annot_dict['path']) == 0:
-                continue
-            record2 = model(annot_dict)
-            # update drawings
-            for key in record2:
-                if 'record' in locals() and 'plots' in record[key]:
-                    record2[key]['plots'] = record[key]['plots']
-            save_dir = make_output_dir(cfgs, 'submission')   
-            record2 = model.post_process(record2, 
-                                         visualize=cfgs['visualize'],
-                                         color_dict={'bbox_2d':'r',
-                                                     'bbox_3d':'r',
-                                                     'kpts':['rx', 'r'],
-                                                     },
-                                         save_dict={'flag':True,
-                                                    'save_dir':save_dir
-                                                    },
-                                         alpha_mode=cfgs['testing_settings']['alpha_mode']
-                                         )   
+            if len(annot_dict['path']) != 0:
+                record2 = model(annot_dict)
+                # update drawings
+                for key in record2:
+                    if 'record' in locals() and 'plots' in record[key]:
+                        record2[key]['plots'] = record[key]['plots']
+                save_dir = make_output_dir(cfgs, 'submission')   
+                record2 = model.post_process(record2, 
+                                             visualize=cfgs['visualize'],
+                                             color_dict={'bbox_2d':'r',
+                                                         'bbox_3d':'r',
+                                                         'kpts':['rx', 'r'],
+                                                         },
+                                             save_dict={'flag':True,
+                                                        'save_dir':save_dir
+                                                        },
+                                             alpha_mode=cfgs['testing_settings']['alpha_mode']
+                                             )   
         if cfgs['visualize']:
             input("Press Enter to view next batch.")
         # set batch_to_show to a small number if you need to visualize 
