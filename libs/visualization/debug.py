@@ -12,6 +12,7 @@ import math
 import numpy as np
 import torchvision
 import cv2
+
 from os.path import join
 
 def draw_circles(ndarr, 
@@ -52,12 +53,12 @@ def save_batch_image_with_joints(batch_image,
                                  nrow=8, 
                                  padding=2
                                  ):
-    '''
+    """
     batch_image: [batch_size, channel, height, width]
     batch_joints: [batch_size, num_joints, 3],
     batch_joints_vis: [batch_size, num_joints, 1],
     }
-    '''
+    """
     grid = torchvision.utils.make_grid(batch_image[:, :3, :, :], nrow, padding, True)
     ndarr = grid.mul(255).clamp(0, 255).byte().permute(1, 2, 0).cpu().numpy()
     ndarr = ndarr.copy()
@@ -84,11 +85,11 @@ def save_batch_heatmaps(batch_image,
                         file_name,
                         normalize=True
                         ):
-    '''
+    """
     batch_image: [batch_size, channel, height, width]
     batch_heatmaps: ['batch_size, num_joints, height, width]
     file_name: saved file name
-    '''
+    """
     if normalize:
         batch_image = batch_image.clone()
         min = float(batch_image.min())
@@ -157,9 +158,16 @@ def save_debug_images(epoch,
                       output, 
                       split
                       ):
+    """
+    Save debugging images during training HC.pth.
+    """    
     if not cfgs['training_settings']['debug']['save']:
         return
-    prefix = join(cfgs['dirs']['output'], split, '{}_{}'.format(epoch, batch_index))
+    prefix = join(cfgs['dirs']['output'], 
+                  "intermediate_results",
+                  split, 
+                  '{}_{}'.format(epoch, batch_index)
+                  )
     make_dir(prefix)
     joints_pred = others['joints_pred']
     debug_cfgs = cfgs['training_settings']['debug']

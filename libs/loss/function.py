@@ -196,7 +196,7 @@ class JointsCompositeLoss(nn.Module):
             else:
                 coordinates_pred_fs = coordinates_pred
             total_loss += self.calc_coor_loss(coordinates_pred_fs, coordinates_gt) * self.comp_dict['coor'][1] 
-        if 'cr' in self.comp_dict and self.apply_cr_loss:
+        if 'cr' in self.comp_dict and self.comp_dict['cr'][1] != "None" and self.apply_cr_loss:
             cr_loss_mask = self.get_cr_mask(coordinates_pred.clone().detach().data.cpu().numpy(), self.cr_loss_thres)
             total_loss += self.calc_cross_ratio_loss(coordinates_pred, self.target_cr, cr_loss_mask) * self.comp_dict['cr'][1]
         return total_loss

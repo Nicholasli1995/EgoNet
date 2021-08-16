@@ -1,11 +1,14 @@
 """
-Warm-up pre-training of the coordinate localization sub-network.
+Training the coordinate localization sub-network.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
 
 import sys
 sys.path.append('../')
+import torch
+import os
 
 import libs.arguments.parse as parse
 import libs.logger.logger as liblogger
@@ -17,15 +20,14 @@ import libs.model as models
 import libs.optimizer.optimizer as optimizer
 import libs.loss.function as loss_func
 
-from libs.common.utils import get_model_summary, save_checkpoint
+from libs.common.utils import get_model_summary
 from libs.metric.criterions import get_distance_src, get_angle_error
 from libs.metric.criterions import Evaluator
 
-import torch
-import os
-
 def choose_loss_func(model_settings, cfgs):
-    # define loss function (criterion) and optimizer
+    """
+    Initialize the loss function used for training. 
+    """
     loss_type = model_settings['loss_type']
     if loss_type == 'JointsCompositeLoss':
         spec_list = model_settings['loss_spec_list']
@@ -45,15 +47,18 @@ def choose_loss_func(model_settings, cfgs):
     return func.cuda()
 
 def train(model, model_settings, GPUs, cfgs, logger, final_output_dir):
-    input_size = model_settings['input_size']
+    """
+    The training method.
+    """
     # get model summary
+    input_size = model_settings['input_size']
     input_channels = 5 if cfgs['heatmapModel']['add_xy'] else 3
     dump_input = torch.rand((1, input_channels, input_size[1], input_size[0]))
     logger.info(get_model_summary(model, dump_input))
     
-
     model = torch.nn.DataParallel(model, device_ids=GPUs).cuda()
 
+    # get forward-pass time if you need 
     # import time
     # dump_input = torch.rand((64, input_channels, input_size[1], input_size[0])).cuda()
     # t1 = time.clock()
@@ -62,34 +67,17 @@ def train(model, model_settings, GPUs, cfgs, logger, final_output_dir):
     # l.backward()
     # torch.cuda.synchronize()
     # print(time.clock() - t1)
-    # return
 
-    # specify loss function (criterion) and optimizer
+    # specify loss function 
     func = choose_loss_func(model_settings, cfgs)
     
     # dataset preparation
     data_cfgs = cfgs['dataset']
     train_dataset, valid_dataset = eval('dataset.' + data_cfgs['name'] + 
                                         '.car_instance').prepare_data(cfgs, logger)
-    
-    # best_perf = 0.0
-    # best_model = False
-    # last_epoch = -1
+    # get the optimizer and learning rate scheduler    
     optim, sche = optimizer.prepare_optim(model, cfgs)
-    # begin_epoch = cfgs['training_settings']['begin_epoch']
-    # end_epoch = cfgs['training_settings']['end_epoch']
-    # checkpoint_path = os.path.join(final_output_dir, 'checkpoint.pth')
-    
-    # if cfgs['training_settings']['resume'] and os.path.exists(checkpoint_path):
-    #     logger.info("=> loading checkpoint '{}'".format(checkpoint_path))
-    #     checkpoint = torch.load(checkpoint_path)
-    #     begin_epoch = checkpoint['epoch']
-    #     best_perf = checkpoint['perf']
-    #     last_epoch = checkpoint['epoch']
-    #     model.load_state_dict(checkpoint['state_dict'], strict=False)
-    #     optimizer.load_state_dict(checkpoint['optimizer'])
-    #     logger.info("=> loaded checkpoint '{}' (epoch {})".format(
-    #         checkpoint_path, checkpoint['epoch']))
+
     # metrics used for training error
     if cfgs['exp_type'] in ['baselinealpha', 'baselinetheta']:
         metric_function = get_angle_error
@@ -111,7 +99,7 @@ def train(model, model_settings, GPUs, cfgs, logger, final_output_dir):
                   save_debug=save_debug_images
                   )
 
-    final_model_state_file = os.path.join(final_output_dir, 'final_state.pth')
+    final_model_state_file = os.path.join(final_output_dir, 'HC.pth')
     logger.info('=> saving final model state to {}'.format(final_model_state_file))
     torch.save(model.module.cpu().state_dict(), final_model_state_file)
     return

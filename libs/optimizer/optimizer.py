@@ -1,11 +1,15 @@
 """
 Optimization utilities.
+
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
 """
 import torch
 
 def prepare_optim(model, cfgs):
+    """
+    Get optimizer and scheduler objects from model parameters.
+    """      
     params = [ p for p in model.parameters() if p.requires_grad]
     lr = cfgs['optimizer']['lr']
     weight_decay = cfgs['optimizer']['weight_decay']

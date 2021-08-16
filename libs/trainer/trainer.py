@@ -24,6 +24,9 @@ import os
 import matplotlib.pyplot as plt
 
 def train_cascade(train_dataset, valid_dataset, cfgs, logger):
+    """
+    Method for training the lifter sub-model L.pth.
+    """    
     # data statistics
     #stats = train_dataset.stats
     stats = None
@@ -41,26 +44,14 @@ def train_cascade(train_dataset, valid_dataset, cfgs, logger):
                                            input_size=input_size,
                                            output_size=output_size
                                            )
-        # train_dataset.set_stage(stage_id+1)
-        # eval_dataset.set_stage(stage_id+1)
         if cfgs['use_gpu']:
             stage_model = stage_model.cuda()
-        # debug
-#        train_dataset.stage_update(stage_model, stats, opt)
         # prepare the optimizer
         optim, sche = optimizer.prepare_optim(stage_model, cfgs)
         loss_type = cfgs['FCModel']['loss_type']
         loss_func = eval('loss_funcs.' + loss_type)(
         reduction=cfgs['FCModel']['loss_reduction']
-        ).cuda()
-        # TODO: a loss that considers geometric consisitency
-        # loss_params = {'reduction':cfgs['FCModel']['loss_reduction'],
-        #                'use_target_weight':cfgs['training_settings']['use_target_weight'],
-        #                'K':train_dataset.intrinsic,
-        #                'mean_3d':train_dataset.statistics,
-        #                'std_3d':train_dataset.statistics
-        #                }
-        # loss_func = eval('loss_funcs.' + loss_type)(loss_params).cuda()        
+        ).cuda()     
         # train the model
         record = train(train_dataset=train_dataset,
                        valid_dataset=valid_dataset, 
@@ -74,9 +65,6 @@ def train_cascade(train_dataset, valid_dataset, cfgs, logger):
                        )
         stage_model = record['model']
         stage_record.append((record['batch_idx'], record['loss']))
-        # update datasets
-        # train_dataset.stage_update(stage_model, stats, opt)
-        # eval_dataset.stage_update(stage_model, stats, opt)
         # put into cascade
         cascade.append(stage_model.cpu())     
         # release memory
@@ -93,6 +81,9 @@ def evaluate_cascade(cascade,
                      action_eval_list=None, 
                      apply_dropout=False
                      ):
+    """
+    Method for evaluating the lifter sub-model L.pth.
+    """ 
     loss, distance = None, None
     for stage_id in range(len(cascade)):
         # initialize the model
@@ -121,6 +112,9 @@ def evaluate_cascade(cascade,
     return loss, distance
 
 def get_loader(dataset, cfgs, split, collate_fn=None):
+    """
+    Prepare a PyTorch dataloader object.
+    """ 
     setting = split + '_settings'   
     arg_dic = {'batch_size': cfgs[setting]['batch_size'],
                'num_workers': cfgs[setting]['num_threads'],
@@ -145,7 +139,7 @@ def train(train_dataset,
           save_debug=False
           ):
     """
-    Training with optional validation.
+    Train a model with optional validation during training.
     """
     # training configurations
     total_epochs = cfgs['training_settings']['total_epochs']
@@ -163,16 +157,6 @@ def train(train_dataset,
                               )
     plot_loss = cfgs['training_settings']['plot_loss'] 
     cuda = cfgs['use_gpu'] and torch.cuda.is_available()
-    # debug evaluation code
-    # evaluate(valid_dataset, 
-    #           model, 
-    #           loss_func, 
-    #           cfgs, 
-    #           logger, 
-    #           evaluator, 
-    #           collate_fn=collate_fn,
-    #           epoch=0
-    #           )
     # optional list storing loss curve 
     x_buffer = []
     y_buffer = []
@@ -189,13 +173,6 @@ def train(train_dataset,
         data_time = AverageMeter()
         losses = AverageMeter()
         acc = AverageMeter()           
-        ## DEBUG
-        # if epoch % 20 == 0:
-        #     logger.info('eval set')
-        #     evaluate(eval_dataset, model, cfgs, logger)
-        #     logger.info('train set')
-        #     evaluate(train_dataset, model, cfgs, logger)
-        ## END DEBUG
         model.train()  
         # modify the learning rate according to the scheduler
         sche.step()
@@ -280,6 +257,9 @@ def train(train_dataset,
     return {'model':model, 'batch_idx':x_buffer, 'loss':y_buffer}  
 
 def initialize_plot():
+    """
+    Initialize loss plot.
+    """     
     x_buffer, y_buffer = [], []
     ax = plt.subplot(111)
     lines = ax.plot(x_buffer, y_buffer)
@@ -288,6 +268,9 @@ def initialize_plot():
     return ax, lines, x_buffer, y_buffer
 
 def update_curve(ax, line, x_buffer, y_buffer):
+    """
+    Update loss plot.
+    """ 
     line.set_xdata(x_buffer)
     line.set_ydata(y_buffer)
     # recompute the ax.dataLim
@@ -309,6 +292,9 @@ def logger_print(epoch,
                  acc,
                  logger
                  ):
+    """
+    Print training logs.
+    """     
     msg = 'Training Epoch: [{0}][{1}/{2}]\t' \
           'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
           'Speed {speed:.1f} samples/s\t' \
@@ -337,6 +323,9 @@ def visualize_lifting_results(data,
                               dist_coeffs=np.zeros((4,1)),
                               meta_data=None
                               ):
+    """
+    Visualizing predictions of the lifter model (optional).
+    """ 
     # only take the coordinates
     if data.shape[1] > 18:
         data = data[:, :18]
@@ -409,6 +398,9 @@ def evaluate(eval_dataset,
              epoch=None,
              sample_num=20
              ):
+    """
+    Method for evaluating a model.
+    """     
     # unnormalize the prediction if needed
     if cfgs['testing_settings']['unnormalize']:
         stats = eval_dataset.statistics

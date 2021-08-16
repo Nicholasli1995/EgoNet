@@ -14,11 +14,13 @@ from libs.common import utils
 initialized = False
 
 def get_dirs(cfgs):
+    """
+    Prepare file directories for a logger object.
+    """     
     root_output_dir = cfgs['dirs']['output']
     dataset_name = cfgs['dataset']['name']
-    model_type = cfgs['model_type']
     cfg_name = cfgs['name']
-    final_output_dir = [root_output_dir, dataset_name, model_type]    
+    final_output_dir = [root_output_dir, dataset_name]    
     final_output_dir = os.path.join(*final_output_dir)
     time_str = time.strftime('%Y-%m-%d %H:%M')
     log_file = '{}_{}.log'.format(cfg_name, time_str)
@@ -26,6 +28,9 @@ def get_dirs(cfgs):
     return final_output_dir, final_log_file
 
 def get_logger(cfgs, head = '%(asctime)-15s %(message)s'):
+    """
+    Prepare a logger object.
+    """     
     final_output_dir, final_log_file = get_dirs(cfgs)
     utils.make_dir(final_log_file)
     logging.basicConfig(filename=str(final_log_file), format=head)
