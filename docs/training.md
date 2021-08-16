@@ -41,7 +41,7 @@ Edit gpu_id according to your local machine and set batch_size based on how much
 
 (Optional) You can evaluate during training by setting eval_during to True.
 
-(Optional) Edit ss to enable self-supervised representation learning. You need to prepare unlabeled images as described here.
+(Optional) Edit ss to enable self-supervised representation learning. You need to prepare unlabeled ApolloScape images and download record [here](https://drive.google.com/file/d/1uPdOC7LioomMF5DieUNrx3aZKsgobP5U/view?usp=sharing).
 
 (Optional) Edit training_settings:debug to disable saveing intermediate training results.
 
