@@ -180,7 +180,10 @@ class JointDistance2DSIP():
         else:
             self.num_joints = cfgs['heatmapModel']['num_joints']
         self.image_size = cfgs['heatmapModel']['input_size']
-        self.arg_max = cfgs['testing_settings']['arg_max']
+	if 'arg_max' in cfgs['testing_settings']:
+            self.arg_max = cfgs['testing_settings']['arg_max']
+	else:
+	    self.arg_max = None
         self.count = 0
         self.mean = 0.
         self.PCK_counts = np.zeros(len(PCK_THRES))
