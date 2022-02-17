@@ -75,6 +75,7 @@ def train(model, model_settings, GPUs, cfgs, logger, final_output_dir):
     data_cfgs = cfgs['dataset']
     train_dataset, valid_dataset = eval('dataset.' + data_cfgs['name'] + 
                                         '.car_instance').prepare_data(cfgs, logger)
+    
     # get the optimizer and learning rate scheduler    
     optim, sche = optimizer.prepare_optim(model, cfgs)
 

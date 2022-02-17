@@ -177,18 +177,18 @@ def jitter_bbox_with_kpts_no_occlu(old_bbox, joints, parameters):
     Similar to the function above, but does not produce occluded joints
     """
     width, height = old_bbox[2] - old_bbox[0], old_bbox[3] - old_bbox[1]
-    old_center = [0.5*(old_bbox[0] + old_bbox[2]), 
-                  0.5*(old_bbox[1] + old_bbox[3])]
-    horizontal_scaling = parameters['scaling'][0]*np.random.rand() + 1
-    vertical_scaling = parameters['scaling'][1]*np.random.rand() + 1
-    horizontal_shift = 0.5*(horizontal_scaling-1)*width*np_random()
-    vertical_shift = 0.5*(vertical_scaling-1)*height*np_random()
+    old_center = [0.5 * (old_bbox[0] + old_bbox[2]), 
+                  0.5 * (old_bbox[1] + old_bbox[3])]
+    horizontal_scaling = parameters['scaling'][0] * np.random.rand() + 1
+    vertical_scaling = parameters['scaling'][1] * np.random.rand() + 1
+    horizontal_shift = 0.5 * (horizontal_scaling - 1) * width * np_random()
+    vertical_shift = 0.5 * (vertical_scaling - 1) * height * np_random()
     new_center = [old_center[0] + horizontal_shift,
                   old_center[1] + vertical_shift]
-    new_width = width*horizontal_scaling
-    new_height = height*vertical_scaling
-    new_bbox = [new_center[0] - 0.5*new_width, new_center[1] - 0.5*new_height,
-                new_center[0] + 0.5*new_width, new_center[1] + 0.5*new_height]
+    new_width = width * horizontal_scaling
+    new_height = height * vertical_scaling
+    new_bbox = [new_center[0] - 0.5 * new_width, new_center[1] - 0.5 * new_height,
+                new_center[0] + 0.5 * new_width, new_center[1] + 0.5 * new_height]
     return new_bbox, joints
 
 def generate_xy_map(bbox, resolution, global_size):

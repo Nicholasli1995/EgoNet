@@ -264,7 +264,10 @@ class KITTI(bc.SupervisedDataset):
     def _prepare_key_points(self, cfgs):
         self.kpts_style = cfgs['dataset']['2d_kpt_style']
         self._prepare_key_points_custom(self.kpts_style, cfgs['dataset']['interpolate'])
-        self.enlarge_factor = 1.1
+        if 'enlarge_factor' in cfgs['dataset']:
+            self.enlarge_factor = cfgs['dataset']['enlarge_factor']
+        else:
+            self.enlarge_factor = 1.1
         return
     
     def _save_cropped_instances(self):
@@ -1275,13 +1278,15 @@ class KITTI(bc.SupervisedDataset):
             parameters = self.hm_para
             parameters['boxes'] = self.annot_2dpose['boxes'][idx]
             # fs: fully-supervised ss: self-supervised
-            images_fs, heatmaps_fs, weights_fs, meta_fs = lip.get_tensor_from_img(img_path, 
-                                                                   parameters, 
-                                                                   joints=kpts,
-                                                                   pth_trans=self.pth_trans,
-                                                                   rf=parameters['rf'],
-                                                                   sf=parameters['sf'],
-                                                                   generate_hm=True)
+            images_fs, heatmaps_fs, weights_fs, meta_fs = \
+                lip.get_tensor_from_img(img_path, 
+                                        parameters, 
+                                        joints=kpts,
+                                        pth_trans=self.pth_trans,
+                                        rf=parameters['rf'],
+                                        sf=parameters['sf'],
+                                        generate_hm=True
+                                        )
             # use random unlabeled images for data augmentation
             if self.split == 'train' and hasattr(self, 'use_ss') and self.use_ss:
                 images_ss, heatmaps_ss, weights_ss, meta_ss = self.extract_ss_sample(len(images_fs))

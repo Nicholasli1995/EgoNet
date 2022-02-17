@@ -421,7 +421,7 @@ class PoseHighResolutionNet(nn.Module):
                 nn.Linear(256, 2)
                 )
         elif self.head_type == 'coordinates':
-            num_chan = 33
+            num_chan = self.num_joints
             self.head1 = nn.Sequential(
                 nn.Conv2d(
                     in_channels=pre_stage_channels[0],
