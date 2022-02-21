@@ -131,7 +131,7 @@ def get_distance_src(output,
         distance_list += get_distance(joints_original, pred_src_coordinates)
         correct_cnt_sum += get_PCK(pred_src_coordinates, joints_original)
     cnt = len(distance_list)
-    avg_acc = sum(distance_list)/cnt
+    avg_acc = sum(distance_list) / cnt
     others = {
         'src_coord': np.concatenate(all_src_coordinates, axis=0), # screen coordinates
         'joints_pred': pred, # predicted local coordinates

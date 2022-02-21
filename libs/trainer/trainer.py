@@ -404,39 +404,64 @@ def evaluate(eval_dataset,
     # unnormalize the prediction if needed
     if cfgs['testing_settings']['unnormalize']:
         stats = eval_dataset.statistics
+        
     # visualize after certain epoch
     if cfgs['exp_type'] == '2dto3d' and 'vis_epoch' in cfgs['testing_settings']:
         vis_epoch = cfgs['testing_settings']['vis_epoch']
     else:
         vis_epoch = -1
+
     all_dists = []
     model.eval()
+    
     # optional: enable dropout in testing to produce loss similar to the training loss
     if cfgs['testing_settings']['apply_dropout']:
         def apply_dropout(m):
             if type(m) == torch.nn.Dropout:
                 m.train()        
         model.apply(apply_dropout)
+        
     intrinsics = None if not hasattr(eval_dataset, 'intrinsic') else \
         eval_dataset.intrinsic
     refine = False if intrinsics is None else True
     eval_loader = get_loader(eval_dataset, cfgs, 'testing', collate_fn)
     cuda = cfgs['use_gpu'] and torch.cuda.is_available()
     losses = AverageMeter()
+    
     # optional: save intermediate results
     if save:
         pred_list = []
         gt_list = []
     has_plot = False # only plot once
+    
     for batch_idx, (data, target, weights, meta) in enumerate(eval_loader):
         if cuda:
-            data, target, weights = data.cuda(), target.cuda(), weights.cuda()        
+            data, target, weights = data.cuda(), target.cuda(), weights.cuda()
+            
         # forward pass to get prediction
         prediction = model(data)
+        
+        # optional: save intermediate results for debugging
+        if cfgs['testing_settings'].get('save_debug', False) and \
+            cfgs.get('exp_type') == 'instanceto2d':
+            joints_pred = prediction[1].data.cpu().numpy()
+            image_size = cfgs['heatmapModel']['input_size']
+            save_debug_images(0, 
+                              batch_idx, 
+                              cfgs, 
+                              data, 
+                              meta, 
+                              target, 
+                              {'joints_pred': joints_pred * image_size[0]}, 
+                              prediction, 
+                              'validation'
+                              )        
+            logger.info('Saved batch {:d}'.format(batch_idx))
 #        if save:
 #            pred_list.append(prediction.data.cpu().numpy())
         loss = loss_func(prediction, target, weights, meta)
         losses.update(loss.item(), data.size(0))
+        
         if cfgs['testing_settings']['unnormalize']:
             # compute distance of body joints in un-normalized format
             target = eval_dataset.unnormalize(target.data.cpu().numpy(), 
@@ -447,7 +472,9 @@ def evaluate(eval_dataset,
                                                   stats['mean_out'], 
                                                   stats['std_out']
                                                   ) 
+            
         evaluator.update(prediction, ground_truth=target, meta_data=meta)
+        
         ## plot 3D bounding boxes for visualization
         if not has_plot and vis_epoch > 0 and epoch > vis_epoch:
             data_unnorm = eval_dataset.unnormalize(data.data.cpu().numpy(), 
@@ -466,6 +493,7 @@ def evaluate(eval_dataset,
         if save:
             pred_list.append(prediction)
             gt_list.append(target)
+
     if save:
         # note the residual update is saved if a cascade is used
         record = {#'data':np.concatenate(data_list, axis=0), 
@@ -474,5 +502,6 @@ def evaluate(eval_dataset,
                   'gt':np.concatenate(gt_list, axis=0)
                   }
         np.save(save_path, np.array(record))
+
     evaluator.report(logger)
     return
