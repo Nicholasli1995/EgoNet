@@ -24,7 +24,8 @@ def draw_circles(ndarr,
                  width, 
                  height, 
                  padding, 
-                 color=[255,0,0]
+                 color=[255,0,0],
+                 add_idx=True
                  ):
     k = 0
     for y in range(ymaps):
@@ -32,18 +33,18 @@ def draw_circles(ndarr,
             if k >= nmaps:
                 break
             joints = batch_joints[k]
-            # joints_vis = batch_joints_vis[k]
-
-            # for joint, joint_vis in zip(joints, joints_vis):
-            #     joint[0] = x * width + padding + joint[0]
-            #     joint[1] = y * height + padding + joint[1]
-            #     if joint_vis.item():
-            #         cv2.circle(ndarr, (int(joint[0]), int(joint[1])), 2, color, 2)
-            for joint in joints:
+            for idx, joint in enumerate(joints):
                 joint[0] = x * width + padding + joint[0]
                 joint[1] = y * height + padding + joint[1]
                 cv2.circle(ndarr, (int(joint[0]), int(joint[1])), 2, color, 2)
-            k = k + 1
+                if add_idx:
+                    cv2.putText(ndarr, 
+                                str(idx+1), 
+                                (int(joint[0]), int(joint[1])), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 
+                                1, color, 1
+                                )
+            k += 1
     return ndarr
 
 # functions used for debugging heatmap-based keypoint localization model      #
@@ -57,7 +58,6 @@ def save_batch_image_with_joints(batch_image,
     batch_image: [batch_size, channel, height, width]
     batch_joints: [batch_size, num_joints, 3],
     batch_joints_vis: [batch_size, num_joints, 1],
-    }
     """
     grid = torchvision.utils.make_grid(batch_image[:, :3, :, :], nrow, padding, True)
     ndarr = grid.mul(255).clamp(0, 255).byte().permute(1, 2, 0).cpu().numpy()

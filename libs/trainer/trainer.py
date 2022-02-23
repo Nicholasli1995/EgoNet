@@ -14,10 +14,9 @@ from libs.common.transformation import procrustes_transform, pnp_refine
 from libs.visualization.debug import save_debug_images
 from libs.common.utils import AverageMeter
 from libs.metric.criterions import Evaluator
+from libs.logger.logger import get_dirs
 
-import torch.nn.functional as F
 import torch
-import cv2
 import numpy as np
 import time
 import os
@@ -253,6 +252,13 @@ def train(train_dataset,
                          )
                 # back to training mode
                 model.train()
+        # save a snapshot
+        if epoch in cfgs['training_settings'].get('snapshot_epochs', []):
+            output_dir, _ = get_dirs(cfgs)
+            prefix = cfgs['exp_type']
+            model_state_file = os.path.join(output_dir, prefix + '_{:d}.pth'.format(epoch))
+            logger.info('=> Snapshot model to {}'.format(model_state_file))
+            torch.save(model.module.state_dict(), model_state_file)
     logger.info('Training finished.')
     return {'model':model, 'batch_idx':x_buffer, 'loss':y_buffer}  
 
