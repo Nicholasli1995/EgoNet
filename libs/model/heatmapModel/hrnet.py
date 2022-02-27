@@ -422,6 +422,8 @@ class PoseHighResolutionNet(nn.Module):
                 )
         elif self.head_type == 'coordinates':
             num_chan = self.num_joints
+            map_width, map_height = cfgs['heatmapModel']['heatmap_size']
+            ks = (int(map_height / 16), int(map_width / 16))
             self.head1 = nn.Sequential(
                 nn.Conv2d(
                     in_channels=pre_stage_channels[0],
@@ -432,7 +434,6 @@ class PoseHighResolutionNet(nn.Module):
                     ), 
                 )
             self.head2 = nn.Sequential(
-                # produce 8*8*num_joints tensor
                 BasicBlock(num_chan+2, 
                            num_chan*2, 
                            stride=2,
@@ -453,11 +454,10 @@ class PoseHighResolutionNet(nn.Module):
                            stride=2,
                            downsample=basicdownsample(num_chan*2, num_chan*2)
                            ),
-                nn.Conv2d(num_chan*2, num_chan*2, kernel_size=4),
+                nn.Conv2d(num_chan*2, num_chan*2, kernel_size=ks),
                 nn.Sigmoid()
                 ) 
             # coordinate convolution makes arg-max easier
-            map_height, map_width = cfgs['heatmapModel']['heatmap_size']
             x_map = np.tile(np.linspace(0, 1, map_width), (map_height, 1))
             x_map = x_map.reshape(1, 1, map_height, map_width)
             y_map = np.linspace(0, 1, map_height).reshape(map_height, 1)
@@ -641,6 +641,7 @@ class PoseHighResolutionNet(nn.Module):
                    or self.pretrained_layers[0] == '*':
                     need_init_state_dict[name] = m
             self.load_state_dict(need_init_state_dict, strict=False)
+            logger.info('{:d} modules initialized.'.format(len(need_init_state_dict)))
         elif pretrained:
             logger.error('=> please download pre-trained models first!')
             raise ValueError('{} does not exist!'.format(pretrained))

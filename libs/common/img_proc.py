@@ -40,8 +40,7 @@ def get_affine_transform(center,
         center = np.array(center)
     scale_tmp = scale * SIZE
     src_w = scale_tmp[0]
-    dst_w = output_size[0]
-    dst_h = output_size[1]
+    dst_h, dst_w = output_size
 
     rot_rad = np.pi * rot / 180
     src_dir = get_dir([0, src_w * -0.5], rot_rad)
@@ -215,7 +214,7 @@ def crop_single_instance(data_numpy, bbox, joints, parameters, pth_trans=None):
     """
     Crop an instance from an image given the bounding box and part coordinates.
     """
-    reso = parameters['input_size']  
+    reso = parameters['input_size'] # (height, width)
     transformed_joints = joints.copy()
     if parameters['jitter_bbox']:
         bbox, joints = jitter_bbox_with_kpts_no_occlu(bbox, 
@@ -232,7 +231,7 @@ def crop_single_instance(data_numpy, bbox, joints, parameters, pth_trans=None):
     trans = get_affine_transform(c, s, 0.0, reso)
     input = cv2.warpAffine(data_numpy,
                            trans,
-                           (int(reso[0]), int(reso[1])),
+                           (int(reso[1]), int(reso[0])),
                            flags=cv2.INTER_LINEAR
                            )
     # add two more channels to encode object location
@@ -366,7 +365,7 @@ def generate_target(joints, joints_vis, parameters):
     assert target_type == 'gaussian', 'Only support gaussian map now!'
 
     if target_type == 'gaussian':
-        target = np.zeros((num_joints, heatmap_size[1], heatmap_size[0]), 
+        target = np.zeros((num_joints, heatmap_size[0], heatmap_size[1]), 
                           dtype=np.float32)
 
         tmp_size = sigma * 3
@@ -380,7 +379,7 @@ def generate_target(joints, joints_vis, parameters):
             # Check that any part of the gaussian is in-bounds
             ul = [int(mu_x - tmp_size), int(mu_y - tmp_size)]
             br = [int(mu_x + tmp_size + 1), int(mu_y + tmp_size + 1)]
-            if ul[0] >= heatmap_size[0] or ul[1] >= heatmap_size[1] \
+            if ul[0] >= heatmap_size[1] or ul[1] >= heatmap_size[0] \
                     or br[0] < 0 or br[1] < 0:
                 # If not, just return the image as is
                 target_weight[joint_id] = 0
@@ -395,11 +394,11 @@ def generate_target(joints, joints_vis, parameters):
             g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
 
             # Usable gaussian range
-            g_x = max(0, -ul[0]), min(br[0], heatmap_size[0]) - ul[0]
-            g_y = max(0, -ul[1]), min(br[1], heatmap_size[1]) - ul[1]
+            g_x = max(0, -ul[0]), min(br[0], heatmap_size[1]) - ul[0]
+            g_y = max(0, -ul[1]), min(br[1], heatmap_size[0]) - ul[1]
             # Image range
-            img_x = max(0, ul[0]), min(br[0], heatmap_size[0])
-            img_y = max(0, ul[1]), min(br[1], heatmap_size[1])
+            img_x = max(0, ul[0]), min(br[0], heatmap_size[1])
+            img_y = max(0, ul[1]), min(br[1], heatmap_size[0])
 
             target[joint_id][img_y[0]:img_y[1], img_x[0]:img_x[1]] = \
                 g[g_y[0]:g_y[1], g_x[0]:g_x[1]]

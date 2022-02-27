@@ -34,13 +34,13 @@ def draw_circles(ndarr,
                 break
             joints = batch_joints[k]
             for idx, joint in enumerate(joints):
-                joint[0] = x * width + padding + joint[0]
-                joint[1] = y * height + padding + joint[1]
-                cv2.circle(ndarr, (int(joint[0]), int(joint[1])), 2, color, 2)
+                xpos = x * width + padding + joint[0]
+                ypos = y * height + padding + joint[1]
+                cv2.circle(ndarr, (int(xpos), int(ypos)), 2, color, 2)
                 if add_idx:
                     cv2.putText(ndarr, 
                                 str(idx+1), 
-                                (int(joint[0]), int(joint[1])), 
+                                (int(xpos), int(ypos)), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 
                                 1, color, 1
                                 )

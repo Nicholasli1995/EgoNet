@@ -121,7 +121,7 @@ def evaluate(model, model_settings, GPUs, cfgs, logger, final_output_dir, eval_t
     trainer.evaluate(valid_dataset, model, loss_func, cfgs, logger, evaluator, collate_fn=collate_fn)    
     if eval_train:
         logger.info("Evaluation on the training split:")
-        trainer.evaluate(train_dataset, model, loss_func, cfgs, logger, evaluator)
+        trainer.evaluate(train_dataset, model, loss_func, cfgs, logger, evaluator, collate_fn=collate_fn)
     return
 
 def main():

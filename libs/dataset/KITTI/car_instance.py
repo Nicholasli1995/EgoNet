@@ -496,11 +496,13 @@ class KITTI(bc.SupervisedDataset):
         # parameters relevant to heatmap regression model and image data augmentation
         if 'heatmapModel' in cfgs:
             hm = cfgs['heatmapModel']
+            jitter_flag = hm['jitter_bbox'] and self.split=='train' and cfgs['train']
             self.hm_para = {'reference': 'bbox',
                             'resize': True,
                             'add_xy': hm['add_xy'],
-                            'jitter_bbox': hm['jitter_bbox'] and self.split=='train',
+                            'jitter_bbox': jitter_flag,
                             'jitter_params': hm['jitter_params'],
+                            # (height, width)
                             'input_size': np.array([hm['input_size'][1],
                                              hm['input_size'][0]]),
                             'heatmap_size': np.array([hm['heatmap_size'][1],

@@ -91,6 +91,7 @@ def get_distance_src(output,
     else:
         raise NotImplementedError
     image_size = image_size if cfgs is None else cfgs['heatmapModel']['input_size']
+    width, height = image_size
     # multiply by down-sample ratio
     if not isinstance(pred, np.ndarray):
         pred = pred.data.cpu().numpy()
@@ -98,7 +99,7 @@ def get_distance_src(output,
         max_vals = max_vals.data.cpu().numpy()
     # the coordinates need to be rescaled for different cases
     if type(output) is tuple:
-        pred *= image_size[0]
+        pred *= np.array(image_size).reshape(1, 1, 2)
     else:
         pred *= image_size[0] / output.shape[3]
     # inverse transform and compare pixel didstance
@@ -120,7 +121,7 @@ def get_distance_src(output,
         trans_inv = lip.get_affine_transform(centers[sample_idx], 
                                              scales[sample_idx], 
                                              rots[sample_idx], 
-                                             image_size, 
+                                             (height, width), 
                                              inv=1
                                              )
         joints_original = joints_original_batch[sample_idx]        

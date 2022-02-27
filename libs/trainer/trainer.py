@@ -452,13 +452,14 @@ def evaluate(eval_dataset,
             cfgs.get('exp_type') == 'instanceto2d':
             joints_pred = prediction[1].data.cpu().numpy()
             image_size = cfgs['heatmapModel']['input_size']
+            joints_pred *= np.array(image_size).reshape(1, 1, 2)
             save_debug_images(0, 
                               batch_idx, 
                               cfgs, 
                               data, 
                               meta, 
                               target, 
-                              {'joints_pred': joints_pred * image_size[0]}, 
+                              {'joints_pred': joints_pred}, 
                               prediction, 
                               'validation'
                               )        

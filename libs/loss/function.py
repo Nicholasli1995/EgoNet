@@ -162,8 +162,8 @@ class JointsCompositeLoss(nn.Module):
         coordinates_pred: [N, K, 2]
         coordinates_gt: [N, K, 2]
         """  
-        coordinates_gt[:, :, 0] /= self.img_size[1]
-        coordinates_gt[:, :, 1] /= self.img_size[0]   
+        coordinates_gt[:, :, 0] /= self.img_size[0]
+        coordinates_gt[:, :, 1] /= self.img_size[1]   
         loss = self.comp_dict['coor'][0](coordinates_pred, coordinates_gt) 
         return loss
     
