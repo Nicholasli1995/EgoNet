@@ -665,6 +665,12 @@ class PoseHighResolutionNet(nn.Module):
                  continue
             param = param.data
             own_state[name].copy_(param)
+
+def is_freezed(name, freeze_names):
+    for prefix in freeze_names:
+        if name.startswith(prefix):
+            return True
+    return False
             
 def get_pose_net(cfgs, is_train, **kwargs):
     model = PoseHighResolutionNet(cfgs, **kwargs)
@@ -672,6 +678,13 @@ def get_pose_net(cfgs, is_train, **kwargs):
     if is_train and cfgs['heatmapModel']['init_weights']:
         model.init_weights(cfgs['heatmapModel']['pretrained'])
 
+    # freeze specified pre-trained layers
+    freeze_names = cfgs['heatmapModel']['extra'].get('freeze_layers', [])
+    for name, param in model.named_parameters():
+        if is_freezed(name, freeze_names):
+            param.requires_grad = False
+            print('{:s} freezed during training.'.format(name))
+                
     if cfgs['heatmapModel']['add_xy']:
         model.modify_input_channel(5)
     return model

@@ -1,0 +1,206 @@
+# YAML file storing experimental configurations for training on KITTI dataset for the Pedestrian class
+
+## general settings
+name: 'kitti_kpt_loc_pedestrian'
+exp_type: 'instanceto2d'
+# baselin
+model_type: 'heatmapModel'
+use_gpu: True
+gpu_id: [0,1,]
+
+## operations
+train: True
+save: True
+visualize: False
+evaluate: False
+
+## output directories
+dirs:
+    # MODIFY them to your preferred directories
+    output: '../outputs/training_record' 
+    # This directory save intermediate training results (optional)
+    debug: '../outputs/training_record/debug' 
+
+## CUDNN settings
+cudnn:
+    enabled: True
+    deterministic: False
+    benchmark: False
+
+## dataset settings
+dataset:
+    name: 'KITTI'
+    detect_classes: ['Pedestrian']
+    3d_kpt_sample_style: 'bbox9'
+    interpolate:
+        flag: True
+        style: 'bbox12'
+        coef: [0.332, 0.667]
+    enlarge_factor: 1.05 # patch size parameter
+    # do some pre-processing
+    pre-process: True
+    root: '/media/nicholas/Database/datasets/KITTI'
+    # augmentation parameters
+    scaling_factor: 0.2
+    rotation_factor: 30. # degrees
+    # pytorch image transformation setting
+    pth_transform:  
+        mean: [0.485, 0.456, 0.406]
+        std: [0.229, 0.224, 0.225]    
+    2d_kpt_style: 'bbox9'
+
+## self-supervision settings
+ss:
+    flag: False
+    # MODIFY this to your unlabeled image record if you enable self-supervised representation learning
+    record_path: '$YOUR_DIR/Apollo_ss_record.npy'
+    img_root: '$YOUR_DIR/ApolloScape/images'
+    max_per_img: 6
+
+## settings for a fully-convolutional heatmap regression model
+heatmapModel:
+    name: hrnet # here a high-resolution (hr) model is used
+    add_xy: False # concatenate xy coodrinate maps along with the input
+    jitter_bbox: True
+    jitter_params:
+        shift:
+        - 0.1
+        - 0.1
+        scaling:
+        - 0.2
+        - 0.2
+    input_size: 
+    - 192
+    - 256
+    # rotate and scaling and input images
+    augment_input: True
+    head_type: 'coordinates'
+    # up-sampling with pixel-shuffle
+    pixel_shuffle: False
+    # if an intermediate heatmap is produced
+    heatmap_size:
+    - 48
+    - 64
+    loss_type: JointsCompositeLoss
+    # the following two settings are only valid for JointsCompositeLoss
+    loss_spec_list: ['mse', 'l1', 'None']
+    loss_weight_list: [1.0, 0.1, 0.]
+    cr_loss_threshold: 0.1
+    init_weights: true
+    num_joints: 33
+    use_different_joints_weight: False
+    # use a pre-trained checkpoint to initialize the model
+    # MODIFY it to your own checkpoint directory
+    pretrained: '../resources/start_point.pth'
+    target_type: gaussian
+    sigma: 2
+    extra:
+        pretrained_layers:
+        - 'conv1'
+        - 'bn1'
+        - 'conv2'
+        - 'bn2'
+        - 'layer1'
+        - 'transition1'
+        - 'stage2'
+        - 'transition2'
+        - 'stage3'
+        - 'transition3'
+        - 'stage4'
+        freeze_layers:
+        - 'conv1'
+        - 'bn1'
+        - 'conv2'
+        - 'bn2'
+        - 'layer1'
+        - 'transition1'
+        - 'stage2'        
+        final_conv_kernel: 1
+        stage2:
+            num_modules: 1
+            num_branches: 2
+            block: basic
+            num_blocks:
+            - 4
+            - 4
+            num_channels:
+            - 32
+            - 64
+            fuse_method: sum
+        stage3:
+            num_modules: 4
+            num_branches: 3
+            block: basic
+            num_blocks:
+            - 4
+            - 4
+            - 4
+            num_channels:
+            - 32
+            - 64
+            - 128
+            fuse_method: sum
+        stage4:
+            num_modules: 3
+            num_branches: 4
+            block: basic
+            num_blocks:
+            - 4
+            - 4
+            - 4
+            - 4
+            num_channels:
+            - 32
+            - 64
+            - 128
+            - 256
+            fuse_method: sum
+
+## training settings  
+training_settings:
+    total_epochs: 40
+    resume: False
+    begin_epoch: 1
+    end_epoch: 10
+    snapshot_epochs: [20, 30, 40]
+    batch_size: 2
+    num_threads: 0
+    shuffle: True
+    pin_memory: False
+    # weighted loss computation
+    use_target_weight: False
+    report_every: 100
+    eval_every: 1000
+    eval_during: True
+    eval_metrics: ['JointDistance2DSIP']
+    plot_loss: False
+    # debugging configurations 
+    debug: 
+        save: True # save some intermeadiate results
+        save_images_kpts: True
+        save_hms_gt: True
+        save_hms_pred: True
+
+## testing settings
+testing_settings:
+    batch_size: 2
+    num_threads: 0
+    shuffle: False
+    pin_memory: False
+    apply_dropout: False
+    unnormalize: False
+    eval_metrics: ['JointDistance2DSIP']
+    # save_debug: True
+    save_debug: False
+
+## optimizer settings
+optimizer:
+    # for ADAM
+    optim_type: 'adam'
+    lr: 0.001
+    weight_decay: 0.0
+    # for SGD
+    momentum: 0.9
+    # learning rate decay
+    milestones: [10, 20, 30]
+    gamma: 0.5
