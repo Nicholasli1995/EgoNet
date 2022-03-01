@@ -4,6 +4,8 @@ Official project website for the CVPR 2021 paper "Exploring intermediate represe
 
 News:
 
+(2022-??-??): v-1.1 will be released which include pre-trained models for other object classes (Pedestrian and Cyclist in KITTI).
+
 (2021-08-16): v-1.0 is released. The training documentation is added.
 
 (2021-06-21): v-0.9 (beta version) is released. **The inference utility is here!** For Q&A, go to [discussions](https://github.com/Nicholasli1995/EgoNet/discussions). If you believe there is a technical problem, submit to [issues](https://github.com/Nicholasli1995/EgoNet/issues). 
