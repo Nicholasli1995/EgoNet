@@ -49,7 +49,7 @@ def main():
             os.mkdir(save_path)
         # save the model and the normalization statistics
         torch.save(cascade[0].cpu().state_dict(), 
-                   os.path.join(save_path, 'L.th')
+                   os.path.join(save_path, 'L.pth')
                    )
         np.save(os.path.join(save_path, 'LS.npy'), train_dataset.statistics)
         logger.info('=> saving final model state to {}'.format(save_path))        

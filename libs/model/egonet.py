@@ -76,11 +76,12 @@ class EgoNet(nn.Module):
         Crop a single instance given an image and bounding box.
         """
         bbox = to_npy(bbox)
-        target_ar = resolution[0] / resolution[1]
+        width, height = resolution
+        target_ar = height / width
         ret = modify_bbox(bbox, target_ar)
         c, s, r = ret['c'], ret['s'], 0.
         # xy_dict: parameters for adding xy coordinate maps
-        trans = get_affine_transform(c, s, r, resolution)
+        trans = get_affine_transform(c, s, r, (height, width))
         instance = cv2.warpAffine(img,
                                   trans,
                                   (int(resolution[0]), int(resolution[1])),
@@ -114,7 +115,7 @@ class EgoNet(nn.Module):
         all_instances = []
         # each record stores attributes of one instance
         all_records = []
-        target_ar = resolution[0] / resolution[1]
+        target_ar = resolution[1] / resolution[0]
         for idx, path in enumerate(annot_dict['path']):
             data_numpy = self.load_cv2(path)
             boxes = annot_dict['boxes'][idx]
@@ -432,8 +433,9 @@ class EgoNet(nn.Module):
             instances = instances.cuda()
         output = self.HC(instances)
         # local part coordinates
+        width, height = self.resolution
         local_coord = output[1].data.cpu().numpy()
-        local_coord *= self.resolution[0]
+        local_coord *= np.array(self.resolution).reshape(1, 1, 2)
         # transform local part coordinates to screen coordinates
         centers = [records[i]['center'] for i in range(len(records))]
         scales = [records[i]['scale'] for i in range(len(records))]
@@ -442,7 +444,7 @@ class EgoNet(nn.Module):
             trans_inv = get_affine_transform(centers[instance_idx],
                                              scales[instance_idx], 
                                              rots[instance_idx], 
-                                             self.resolution, 
+                                             (height, width), 
                                              inv=1
                                              )
             screen_coord = affine_transform_modified(local_coord[instance_idx], 

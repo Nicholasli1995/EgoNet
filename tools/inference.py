@@ -77,7 +77,14 @@ def filter_conf(record, thres=0.0):
         }
     return True, filterd_record
 
-def gather_dict(request, references, filter_c=True, larger=True, thres=0.):
+def gather_dict(request, 
+                references, 
+                filter_c=True, 
+                larger=True, 
+                thres=0.,
+                target_ar=1.,
+                enlarge=1.2
+                ):
     """
     Gather a annotation dictionary from the prepared detections as requsted.
     """
@@ -104,8 +111,8 @@ def gather_dict(request, references, filter_c=True, larger=True, thres=0.):
             # enlarge the input bounding box if needed            
             for instance_id in range(len(bbox)):
                 bbox[instance_id] = np.array(modify_bbox(bbox[instance_id], 
-                                                         target_ar=1, 
-                                                         enlarge=1.2
+                                                         target_ar=target_ar, 
+                                                         enlarge=enlarge
                                                          )['bbox']
                                              )
         ret['boxes'].append(bbox)
@@ -158,8 +165,14 @@ def inference(testset, model, results, cfgs):
             merge(all_records, record)
         if cfgs['use_pred_box']:
             # use detected bounding box from any 2D/3D detector
-            thres = cfgs['conf_thres'] if 'conf_thres' in cfgs else 0.
-            annot_dict = gather_dict(meta, results['pred'], thres=thres)
+            thres = cfgs.get('conf_thres', 0.)
+            width, height = cfgs['heatmapModel']['input_size']
+            enlarge = cfgs['dataset'].get('enlarge_factor', 1.2)
+            annot_dict = gather_dict(meta, results['pred'], 
+                                     thres=thres,
+                                     target_ar=height/width,
+                                     enlarge=enlarge
+                                     )
             if len(annot_dict['path']) != 0:
                 record2 = model(annot_dict)
                 # update drawings

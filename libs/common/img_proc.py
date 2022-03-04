@@ -199,7 +199,7 @@ def generate_xy_map(bbox, resolution, global_size):
     resolution (height, width): target resolution
     global_size (height, width): the size of original image
     """
-    map_height, map_width = resolution
+    map_width, map_height = resolution
     g_height, g_width = global_size
     x_start, x_end = 2*bbox[0]/g_width - 1, 2*bbox[2]/g_width - 1
     y_start, y_end = 2*bbox[1]/g_height - 1, 2*bbox[3]/g_height - 1
