@@ -132,6 +132,7 @@ class KITTI(bc.SupervisedDataset):
         self._get_data_parameters(cfgs) # initialize hyper-parameters
         self._set_paths() # initialize paths
         self._inference_mode = False 
+        self.use_stereo = cfgs['dataset'].get('use_stereo', False) 
         self.car_sizes = [] # dimension of cars
         self._load_image_list()
         if self.split in ['train', 'valid', 'trainvalid'] and \
@@ -344,10 +345,6 @@ class KITTI(bc.SupervisedDataset):
                 'kpts':all_keypoints,
                 'raw_kpts':all_keypoints_raw
                 }
-    
-    def _prepare_detection_records(self, save=False, threshold = 0.1):
-        # DEPRECATED UNTIL FURTHER UPDATE
-        raise ValueError
 
     def gather_annotations(self, 
                            threshold=0.1, 
@@ -379,6 +376,18 @@ class KITTI(bc.SupervisedDataset):
                 record_dict[image_name] = {}
         self.annot_dict = record_dict
         return     
+
+    def get_crop_bbox(self, kpts):
+        center_l, crop_size_l, _, _ = lip.kpts2cs(kpts[:,:2], enlarge=1.01)
+        bbox_l = np.array(lip.cs2bbox(center_l, crop_size_l))             
+        bbox = bbox_l
+        # stereo case: bounding boxes for two images
+        if self.use_stereo and kpts.shape[1] >= 4:
+            center_r, crop_size_r, _, _ = lip.kpts2cs(kpts[:,2:4], enlarge=1.01)
+            bbox_r = np.array(lip.cs2bbox(center_r, crop_size_r))              
+            bbox = np.concatenate([bbox_l, bbox_r], axis=0)
+        return bbox.reshape(1, -1)  
+
     
     def read_single_file(self, 
                          image_name, 
@@ -416,24 +425,18 @@ class KITTI(bc.SupervisedDataset):
             return False        
         if image_name not in record_dict:
             record_dict[image_name] = {}
-        raw_annot, P = self.load_annotations(label_path, calib_path, fieldnames=fieldnames)
-        # use different (slightly) intrinsic parameters for different images
-        K = P[:, :3]  
-        if len(list_2d) != 0:
-            for idx, kpts in enumerate(list_2d):
-                list_2d[idx] = kpts.reshape(1, -1, 3)
-                list_3d[idx] = list_3d[idx].reshape(1, -1, 3)
+        raw_annot, Pl, Pr = self.load_annotations(label_path, calib_path, fieldnames=fieldnames)
+        Kl, Kr = Pl[:, :3], Pr[:, :3]  
+        if len(list_3d) != 0:
+            for idx, kpts in enumerate(list_3d):
+                # list_2d[idx] = kpts.reshape(1, -1, 3)
+                list_3d[idx] = kpts.reshape(1, self.num_joints, -1)
             all_keypoints_2d = np.concatenate(list_2d, axis=0)
             all_keypoints_3d = np.concatenate(list_3d, axis=0)                       
             # compute 2D bounding box based on the projected 3D boxes
             bboxes_kpt = []
-            for idx, keypoints in enumerate(all_keypoints_2d):
-                # relatively tight bounding box: use enlarge = 1.0
-                # delete invisible instances
-                center, crop_size, _, _ = lip.kpts2cs(keypoints[:,:2],
-                                                      enlarge=1.01)
-                bbox = np.array(lip.cs2bbox(center, crop_size))             
-                bboxes_kpt.append(np.array(bbox).reshape(1, 4))
+            for idx, keypoints in enumerate(all_keypoints_2d):           
+                bboxes_kpt.append(self.get_crop_bbox(keypoints))
             record_dict[image_name]['kpts_3d'] = all_keypoints_3d
             if add_gt:
                 # special key name representing ground truth
@@ -446,7 +449,8 @@ class KITTI(bc.SupervisedDataset):
             
         record_dict[image_name]['bbox_2d'] = bboxes
         record_dict[image_name]['raw_txt_format'] = raw_annot
-        record_dict[image_name]['K'] = K
+        record_dict[image_name]['Kl'] = Kl
+        record_dict[image_name]['Kr'] = Kr
         # add some key-value pairs as ground truth annotation
         if add_gt:         
             pvs = np.vstack(pv) if len(pv) != 0 else []
@@ -690,12 +694,13 @@ class KITTI(bc.SupervisedDataset):
         Get the input/output size for 2d-to-3d lifting.
         """
         num_joints = self.num_joints
+        num_views = 2 if self.use_stereo else 1
         if self._data_config['lft_in_rep'] == 'coordinates2d':
-             input_size = num_joints*2
+             input_size = num_joints * 2 * num_views
         else:
              raise NotImplementedError
         if self._data_config['lft_out_rep'] in ['R3d+T']:
-             output_size = num_joints*3
+             output_size = num_joints * 3
         elif self._data_config['lft_out_rep'] in ['R3d']:
              output_size = (num_joints - 1) * 3             
         else:
@@ -746,7 +751,15 @@ class KITTI(bc.SupervisedDataset):
                                           )
         return corners_3d
     
-    def get_cam_cord(self, cam_cord, shift, ids, pose_vecs, rot_xz=False):
+    def get_cam_cord(self, 
+                     cam_cord_l, 
+                     cam_cord_r, 
+                     shift_l, 
+                     shift_r, 
+                     ids, 
+                     pose_vecs, 
+                     rot_xz=False
+                     ):
         """
         Construct 3D bounding box corners in the camera coordinate system.
         """         
@@ -785,8 +798,11 @@ class KITTI(bc.SupervisedDataset):
             corners_3d = np.matmul(rot_mat, corners_3d_fixed)
             # translation
             corners_3d += np.array([x, y, z]).reshape([3, 1])
-            camera_coordinates = corners_3d + shift
-            cam_cord.append(camera_coordinates.T)
+            camera_coordinates_l = corners_3d + shift_l
+            cam_cord_l.append(camera_coordinates_l.T)
+            if self.use_stereo:
+                camera_coordinates_r = corners_3d + shift_r
+                cam_cord_r.append(camera_coordinates_r.T)                
         return 
     
     def csv_read_annot(self, file_path, fieldnames):
@@ -832,15 +848,21 @@ class KITTI(bc.SupervisedDataset):
         """
         Read camera projection matrix in the KITTI format.
         """  
+        def proj_mat_from_row(row):
+            P = row[1:]
+            P = [float(i) for i in P]
+            P = np.array(P, dtype=np.float32).reshape(3, 4)            
+            return P
+        
         with open(file_path, 'r') as csv_file:
             reader = csv.reader(csv_file, delimiter=' ')
             for line, row in enumerate(reader):
                 if row[0] == 'P2:':
-                    P = row[1:]
-                    P = [float(i) for i in P]
-                    P = np.array(P, dtype=np.float32).reshape(3, 4)
-                    break        
-        return P
+                    Pl = proj_mat_from_row(row)
+                if row[0] == 'P3:':
+                    Pr = proj_mat_from_row(row)     
+                    break
+        return Pl, Pr
     
     def load_annotations(self, label_path, calib_path, fieldnames=FIELDNAMES): 
         """
@@ -849,22 +871,27 @@ class KITTI(bc.SupervisedDataset):
         if self.split in ['train', 'valid', 'trainvalid', 'test']:
             annotations = self.csv_read_annot(label_path, fieldnames)
         # get camera intrinsic matrix K
-        P = self.csv_read_calib(calib_path)
-        return annotations, P
+        Pl, Pr = self.csv_read_calib(calib_path)
+        return annotations, Pl, Pr
     
     def add_visibility(self, joints, img_width=1242, img_height=375):
         """
         Compute binary visibility of projected 2D parts.
         """  
-        assert joints.shape[1] == 2
+        assert joints.shape[1] in [2, 4]
         visibility = np.ones((len(joints), 1))
         # predicate from upper left corner
-        predicate1 = joints - np.array([[0., 0.]])
+        predicate1 = joints - np.zeros((1, joints.shape[1]))
         predicate1 = (predicate1 > 0.).prod(axis=1)
         # predicate from lower right corner
-        predicate2 = joints - np.array([[img_width, img_height]])
+        predicate2 = joints[:,:2] - np.array([[img_width, img_height]])
         predicate2 = (predicate2 < 0.).prod(axis=1)
-        visibility[:, 0] *= predicate1*predicate2      
+        visibility[:, 0] *= predicate1 * predicate2
+        # stereo case: paired joints
+        if joints.shape[1] == 4:
+            predicate3 = joints[:,2:4] - np.array([[img_width, img_height]])
+            predicate3 = (predicate3 < 0.).prod(axis=1)
+            visibility[:, 0] *= predicate3
         return np.hstack([joints, visibility])
     
     def get_inlier_indices(self, p_2d, threshold=0.3):
@@ -925,21 +952,25 @@ class KITTI(bc.SupervisedDataset):
             label_path = pjoin(self._data_config['label_dir'], image_name[:-3] + 'txt')
         if calib_path is None:
             calib_path = pjoin(self._data_config['calib_dir'], image_name[:-3] + 'txt')
-        anns, P = self.load_annotations(label_path, calib_path, fieldnames=fieldnames)
+        anns, Pl, Pr = self.load_annotations(label_path, calib_path, fieldnames=fieldnames)
         # The intrinsics may vary slightly for different images
         # Yet one may convert them to a fixed one by applying a homography
-        K = P[:, :3]
+        Kl, Kr = Pl[:, :3], Pr[:, :3]
         # Debug: use pre-defined intrinsic parameters
         # K = np.array([[707.0493,   0.    , 604.0814],
         #               [  0.    , 707.0493, 180.5066],
         #               [  0.    ,   0.    ,   1.    ]], dtype=np.float32)
-        shift = np.linalg.inv(K) @ P[:, 3].reshape(3,1)      
+        shift_l = np.linalg.inv(Kl) @ Pl[:, 3].reshape(3,1)  
+        if self.use_stereo:
+            shift_r = np.linalg.inv(Kr) @ Pr[:, 3].reshape(3,1)  
+        else:
+            shift_r = None
         # P containes intrinsics and extrinsics, I factorize P to K[I|K^-1t] 
         # and use extrinsics to compute the camera coordinate
         # here the extrinsics represent the shift between current camera to
         # the reference grayscale camera        
         # For more calibration details, refer to "Vision meets Robotics: The KITTI Dataset"
-        camera_coordinates = []
+        camera_coordinates_l, camera_coordinates_r  = [], []
         pose_vecs = []
         # id includes the class and size of the object
         ids = []
@@ -968,21 +999,30 @@ class KITTI(bc.SupervisedDataset):
                                                               augment,
                                                               augment_times
                                                               )
-            self.get_cam_cord(camera_coordinates, 
-                              shift, 
+            self.get_cam_cord(camera_coordinates_l,
+                              camera_coordinates_r,
+                              shift_l, 
+                              shift_r,
                               aug_ids, 
                               aug_pose_vecs
                               )                    
             ids += aug_ids
             pose_vecs += aug_pose_vecs
-        num_instances = len(camera_coordinates)
+        num_instances = len(camera_coordinates_l)
         # get 2D projections 
-        if len(camera_coordinates) != 0:
-            camera_coordinates = np.vstack(camera_coordinates)
-            projected = self.project_3d_to_2d(camera_coordinates, K)[:2, :].T
+        if num_instances != 0:
+            camera_coordinates_l = np.vstack(camera_coordinates_l)
+            projected_l = self.project_3d_to_2d(camera_coordinates_l, Kl)[:2, :].T
+            if self.use_stereo:
+                camera_coordinates_r = np.vstack(camera_coordinates_r)
+                projected_r = self.project_3d_to_2d(camera_coordinates_r, Kr)[:2, :].T
             # target is camera coordinates
-            p_2d = np.split(projected, num_instances, axis=0) 
-            p_3d = np.split(camera_coordinates, num_instances, axis=0) 
+            if self.use_stereo:
+                paired = np.concatenate([projected_l, projected_r], axis=1)
+                p_2d = np.split(paired, num_instances, axis=0) 
+            else:
+                p_2d = np.split(projected_l, num_instances, axis=0) 
+            p_3d = np.split(camera_coordinates_l, num_instances, axis=0) 
             # set visibility to 0 if the projected keypoints lie out of the image plane
             if add_visibility:
                 width, height = self.get_img_size(image_path)
@@ -1076,13 +1116,13 @@ class KITTI(bc.SupervisedDataset):
             id_list += ids
         # does not use visibility as input
         num_instance = len(input_list)
-        self.input = np.vstack(input_list)[:, :, :2].reshape(num_instance, -1)
+        self.num_joints = input_list[0].shape[1]
+        self.input = np.vstack(input_list)[:, :, :-1].reshape(num_instance, -1)
         # use visibility as input
         # self.input = np.vstack(input_list).reshape(num_instance, -1)
         self.output = np.vstack(output_list) 
         if hasattr(self, 'root_list'):
             self.root_list = np.vstack(self.root_list)
-        self.num_joints = int(self.input.shape[1]/2)      
         return
     
     def generate_pairs(self):
@@ -1220,19 +1260,19 @@ class KITTI(bc.SupervisedDataset):
         """  
         # only return testing images during inference
         if self.split == 'test' or self._inference_mode:
-            #TODO: consider classes except for cars in the future
             img_name = self.annoted_img_paths[idx]
             # debug: use a specified image for visualization
             # img_name = "006658.png"
-            img_path = pjoin(self._data_config['image_dir'], img_name)
+            left_path = pjoin(self._data_config['image_dir'], img_name)
+            right_path = left_path.replace('image_2', 'image_3')
             if self._read_img_during_inference:
-                image = lip.imread_rgb(img_path)
+                image = lip.imread_rgb(left_path)
             else:
                 image = None
             if self._read_img_during_inference and hasattr(self, 'pth_trans'):
                 # pytorch transformation if provided
                 image = self.pth_trans(image)
-            record = {'path':img_path}
+            record = {'path_l':left_path, 'path_r':right_path}
             # add other available annotations
             if hasattr(self, 'annot_dict'):
                 record = {**record, **self.annot_dict[img_name]}

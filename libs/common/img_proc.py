@@ -454,8 +454,16 @@ def modify_bbox(bbox, target_ar, enlarge=1.1):
     """
     Modify a bounding box by enlarging/resizing.
     """
-    lbbox = enlarge_bbox(bbox[0], bbox[1], bbox[2], bbox[3], [enlarge, enlarge])
-    ret = resize_bbox(lbbox[0], lbbox[1], lbbox[2], lbbox[3], target_ar=target_ar)
+    lbbox = enlarge_bbox(*bbox[:4], [enlarge, enlarge])
+    ret = resize_bbox(*lbbox, target_ar=target_ar)
+    if len(bbox) == 8:
+        # boxes on the right images
+        rbbox = enlarge_bbox(*bbox[4:], [enlarge, enlarge])
+        retr = resize_bbox(*rbbox, target_ar=target_ar)
+        ret = {'bbox':ret['bbox'] + retr['bbox'],
+               'c':np.concatenate([ret['c'], retr['c']]),
+               's':np.concatenate([ret['s'], retr['s']])
+               }
     return ret
     
 def resize_crop(crop_size, target_ar=None):

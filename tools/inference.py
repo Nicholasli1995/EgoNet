@@ -4,7 +4,8 @@ Inference of Ego-Net on KITTI dataset.
 The user can provide the 3D bounding boxes predicted by other 3D object detectors
 and run Ego-Net to refine the orientation of these instances.
 
-The user can also visualize the intermediate results.
+The user can choose to use monocular or stereo images as inputs and visualize 
+the intermediate results.
 
 Author: Shichao Li
 Contact: nicholas.li@connect.ust.hk
@@ -20,6 +21,7 @@ import libs.dataset.KITTI.car_instance as libkitti
 from libs.common.img_proc import modify_bbox
 from libs.trainer.trainer import get_loader
 from libs.model.egonet import EgoNet
+from libs.model.egonet_s import EgoNetS
 
 import shutil
 import torch
@@ -73,7 +75,8 @@ def filter_conf(record, thres=0.0):
         'kpts_3d': record['kpts_3d'][indices],
         'raw_txt_format': [annots[i] for i in indices],
         'scores': [annots[i]['score'] for i in indices],
-        'K':record['K']
+        'Kl':record['Kl'],
+        'Kr':record['Kr'],
         }
     return True, filterd_record
 
@@ -88,14 +91,17 @@ def gather_dict(request,
     """
     Gather a annotation dictionary from the prepared detections as requsted.
     """
-    assert 'path' in request
-    ret = {'path':[], 
+    assert 'path_l' in request
+    ret = {'path_l':[],
+           'path_r':[],
            'boxes':[], 
            'kpts_3d_before':[], 
            'raw_txt_format':[],
            'scores':[],
-           'K':[]}
-    for img_path in request['path']:
+           'Kl':[],
+           'Kr':[]
+           }
+    for idx, img_path in enumerate(request['path_l']):
         img_name = img_path.split('/')[-1]
         if img_name not in references:
             print('Warning: ' + img_name + ' not included in detected images!')
@@ -105,7 +111,8 @@ def gather_dict(request,
             success, ref = filter_conf(ref, thres=thres)
         if filter_c and not success:
             continue
-        ret['path'].append(img_path)
+        ret['path_l'].append(img_path)
+        ret['path_r'].append(request['path_r'][idx])
         bbox = ref['bbox_2d']
         if larger:
             # enlarge the input bounding box if needed            
@@ -121,7 +128,8 @@ def gather_dict(request,
         # raw prediction strings used for later saving
         ret['raw_txt_format'].append(ref['raw_txt_format'])
         ret['scores'].append(ref['scores'])
-        ret['K'].append(ref['K'])
+        ret['Kl'].append(ref['Kl'])
+        ret['Kr'].append(ref['Kr'])
     if 'pose_vecs_gt' in request:
         ret['pose_vecs_gt'] = request['pose_vecs_gt']
     return ret
@@ -258,7 +266,10 @@ def main():
         results['pred'] = dataset_inf.read_predictions(input_file_path)
     
     # Initialize Ego-Net and load the pre-trained checkpoint
-    model = EgoNet(cfgs, pre_trained=True)
+    if cfgs['dataset'].get('use_stereo', False):
+        model = EgoNetS(cfgs, pre_trained=True)
+    else:
+        model = EgoNet(cfgs, pre_trained=True)
     model = model.eval().cuda()
     
     # perform inference and save the (updated) predictions
