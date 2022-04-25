@@ -718,9 +718,9 @@ void saveAndPlotPlots(string dir_name,string file_name,string obj_type,vector<do
 
   float sum[3] = {0, 0, 0};
   for (int v = 0; v < 3; ++v)
-      for (int i = 0; i < vals[v].size(); i = i + 1)
+      for (int i = 1; i < vals[v].size(); i = i + 1)
           sum[v] += vals[v][i];
-  printf("%s AP: %f %f %f\n", file_name.c_str(), sum[0] / 41 * 100, sum[1] / 41 * 100, sum[2] / 41 * 100);
+  printf("%s AP: %f %f %f\n", file_name.c_str(), sum[0] / 40 * 100, sum[1] / 40 * 100, sum[2] / 40 * 100);
 
 
   // create png + eps
